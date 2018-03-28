@@ -1,5 +1,7 @@
 BINDIR ?= bin
 
+all: mooshy
+
 deps:
 	@command -v dep > /dev/null || go get -u github.com/golang/dep/cmd/dep
 	@dep ensure
@@ -9,6 +11,4 @@ $(BINDIR)/mooshy:
 
 mooshy: $(BINDIR)/mooshy
 
-all: mooshy
-
-.PHONY: all $(BINDIR)/mooshy mooshy deps
+.PHONY: all deps mooshy $(BINDIR)/mooshy
