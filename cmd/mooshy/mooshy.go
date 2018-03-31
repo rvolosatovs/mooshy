@@ -97,13 +97,18 @@ type ShellCodeRunner interface {
 }
 
 func main() {
+	var home string
+
 	u, err := user.Current()
 	if err != nil {
-		log.Printf("Failed to get current user: %s", err)
+		log.Println("Failed to get current user: %s", err)
+		home = os.Getenv("HOME")
+	} else {
+		home = u.HomeDir
 	}
 
-	knownHosts := filepath.Join(u.HomeDir, ".ssh", "known_hosts")
-	sshKey := filepath.Join(u.HomeDir, ".ssh", "id_rsa")
+	knownHosts := filepath.Join(home, ".ssh", "known_hosts")
+	sshKey := filepath.Join(home, ".ssh", "id_rsa")
 	sshAgent := os.Getenv("SSH_AUTH_SOCK")
 
 	flag.StringVar(&knownHosts, "sshKnown", knownHosts, "Path to SSH known_hosts file")
