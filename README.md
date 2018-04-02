@@ -2,7 +2,7 @@
 
 # Mooshy
 
-[![asciicast](https://asciinema.org/a/SHth0ikiPmRPx4QRv8hXf61RN.png)](https://asciinema.org/a/SHth0ikiPmRPx4QRv8hXf61RN)
+[![asciicast](https://asciinema.org/a/zK5uZERZHIAw1TsNng2o8eDqX.png)](https://asciinema.org/a/zK5uZERZHIAw1TsNng2o8eDqX)
 
 Installation:
 ```sh
