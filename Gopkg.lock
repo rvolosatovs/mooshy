@@ -2,10 +2,22 @@
 
 
 [[projects]]
+  branch = "master"
+  name = "github.com/kr/fs"
+  packages = ["."]
+  revision = "2788f0dbd16903de03cb8186e5c7d97b69ad387b"
+
+[[projects]]
   name = "github.com/pkg/errors"
   packages = ["."]
   revision = "645ef00459ed84a119197bfb8d8205042c6df63d"
   version = "v0.8.0"
+
+[[projects]]
+  name = "github.com/pkg/sftp"
+  packages = ["."]
+  revision = "49488377fa2f14143ba3067cf7555f60f6c7b550"
+  version = "1.5.0"
 
 [[projects]]
   branch = "master"
@@ -24,6 +36,6 @@
 [solve-meta]
   analyzer-name = "dep"
   analyzer-version = 1
-  inputs-digest = "55929edbe1e38586ca4d19ea78779bb51bb6db8d562ff298c45c46de7f628c86"
+  inputs-digest = "8dbe98d412d4340307a89a1779ddef7cf06e64e0c916c121c9868fb79b919925"
   solver-name = "gps-cdcl"
   solver-version = 1
