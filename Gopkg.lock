@@ -2,6 +2,15 @@
 
 
 [[projects]]
+  name = "github.com/google/gopacket"
+  packages = [
+    ".",
+    "layers"
+  ]
+  revision = "11c65f1ca9081dfea43b4f9643f5c155583b73ba"
+  version = "v1.1.14"
+
+[[projects]]
   branch = "master"
   name = "github.com/kr/fs"
   packages = ["."]
@@ -36,6 +45,6 @@
 [solve-meta]
   analyzer-name = "dep"
   analyzer-version = 1
-  inputs-digest = "8dbe98d412d4340307a89a1779ddef7cf06e64e0c916c121c9868fb79b919925"
+  inputs-digest = "9350004bd50e464d3000410c6c72a8ef4e3b508873596a88c796fed9da931b68"
   solver-name = "gps-cdcl"
   solver-version = 1

