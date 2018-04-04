@@ -24,7 +24,7 @@ $(BINDIR)/cow: dirtycow/dirtycow.c
 
 cmd/moosh/cow.go: $(BINDIR)/cow
 	@echo "Generating shellcode..."
-	@echo -ne "package main\n\nvar DirtyCow = []byte{$(shell cat $(BINDIR)/cow | msfvenom -p - -a x64 --platform linux -f elf | xxd -i)}" > cmd/moosh/cow.go
+	@echo -ne "package main\n\nvar DirtyCow = []byte{$(shell cat $(BINDIR)/cow | xxd -i)}" > cmd/moosh/cow.go
 	@gofmt -w -s ./cmd/moosh/cow.go
 
 $(BINDIR)/moosh: cmd/moosh/cow.go cmd/moosh/moosh.go vendor
