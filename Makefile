@@ -4,7 +4,7 @@ BINDIR ?= bin
 VUSER ?= "averagejoe"
 VHOST ?= "192.168.56.101"
 
-all: mooshy moosh backdoor
+all: mooshy moosh hhttpd backdoor
 
 deps:
 	@command -v dep > /dev/null || go get -u -v github.com/golang/dep/cmd/dep
@@ -37,6 +37,9 @@ $(BINDIR)/mooshy: cmd/mooshy/mooshy.go vendor
 	@echo "Compiling mooshy..."
 	@CGO_ENABLED=0 GOARCH=amd64 go build -o $(BINDIR)/mooshy ./cmd/mooshy
 
+$(BINDIR)/hhttpd:
+	gcc -o $(BINDIR)/hhttpd ./target/hhttpd.c
+
 $(BINDIR)/backdoor: cmd/backdoor/backdoor.go vendor
 	@echo "Compiling backdoor..."
 	@CGO_ENABLED=0 GOARCH=amd64 go build -o $(BINDIR)/backdoor ./cmd/backdoor
@@ -44,10 +47,11 @@ $(BINDIR)/backdoor: cmd/backdoor/backdoor.go vendor
 moosh: $(BINDIR)/moosh
 mooshy: $(BINDIR)/mooshy
 backdoor: $(BINDIR)/backdoor
+hhttpd: $(BINDIR)/hhttpd
 cow: cmd/moosh/cow.go
 
 clean:
-	rm -rf $(BINDIR)/{backdoor,moosh,mooshy,cow} cmd/moosh/cow.go vendor
+	rm -rf $(BINDIR)/{backdoor,moosh,mooshy,cow,hhttpd} cmd/moosh/cow.go vendor
 
 .SECONDARY: $(BINDIR)/cow
-.PHONY: all deps mooshy moosh fmt cow clean backdoor
+.PHONY: all deps mooshy moosh fmt cow clean backdoor hhttpd
