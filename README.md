@@ -16,7 +16,7 @@
 
 ### To regenerate shellcode:
 ```sh
-    make
+    make -B cow
 ```
 
 ## Usage:
@@ -51,8 +51,20 @@ The tool operates in 2 modes - infection and execution.
 ## Infection mode
 - Connects to the victim machine(s):
     - Connect using SSH to the `addr` specified and/or all hosts in `known_hosts` file, using either a running SSH agent(with `SSH_AUTH_SOCK` set in environment) or using password-less key, which has access to the machine(s).
-- Performs a privilege escalation attack using a [Linux kernel vuln](dirtycow.ninja) (PoC uses vanilla Ubuntu 16.04 LTS) to overwrite SUID binary(`mooshy` uses `/usr/bin/passwd`) by shellcode, which sets `/proc/sys/vm/dirty_writeback_centisecs` to `0` to prevent kernel panic due to invalid state, which would otheriwse occur shortly after the execution of exploit and `exec`s `/bin/bash` with SUID bit prepended.
-- Using the "suid root shell" installs the backdoor on the system.
-- Restores the contents of the original binary.
+    - TODO: Buffer overflow of a HHTPD server and open reverse shell
+- 
+- Downloads and exectues the `moosh` binary to the victim machine, which performs a privilege escalation attack using a [Linux kernel vulnerability(CVE-2016-5195)](https://nvd.nist.gov/vuln/detail/CVE-2016-5195) (PoC uses vanilla Ubuntu 16.04 LTS VM) to overwrite SUID binary(`mooshy` uses `/usr/bin/passwd`) by shellcode, which sets `/proc/sys/vm/dirty_writeback_centisecs` to `0` to prevent kernel panic due to invalid state, which would otheriwse occur shortly after the execution of exploit and `exec`s `/bin/bash` with `root` privileges(it's a SUID binary owned by `root`).
+- TODO: Using the "suid root shell" installs the backdoor on the system, downloads and prepends a command to start the backdoor in the `ExecStart` line.
+- Restores the contents of the original binary in it's location.
 in "execute" mode:
 - Connects to the infected victim and returns a reverse `root` shell.
+
+# Dirty CoW exploit
+>  A race condition was found in the way Linux kernel's memory subsystem
+>  handled breakage of the read only private mappings COW situation on
+>  write access.
+>
+>  An unprivileged local user could use this flaw to gain
+>  write access to otherwise read only memory mappings and thus increase
+>  their privileges on the system.
+[Source](https://bugzilla.redhat.com/show_bug.cgi?id=1384344#)
