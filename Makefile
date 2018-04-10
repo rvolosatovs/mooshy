@@ -1,4 +1,4 @@
-SHELL = /bin/sh
+SHELL = /usr/bin/env bash
 
 BINDIR ?= bin
 VUSER ?= "averagejoe"
@@ -7,58 +7,79 @@ VHOST ?= "192.168.56.101"
 all: mooshy moosh hhttpd backdoor
 
 deps:
+	$(info Checking development deps...)
 	@command -v dep > /dev/null || go get -u -v github.com/golang/dep/cmd/dep
-	@echo "Syncing deps..."
+	@command -v xxd > /dev/null || { printf 'Please install xxd\n'; exit 1; }
+	$(info Syncing go deps...)
 	@dep ensure -v
+
+report-deps:
+	$(info Checking the report deps...)
+	@command -v pandoc > /dev/null || { printf 'Please install pandoc\n'; exit 1; }
 
 vendor: deps
 
 fmt:
-	@echo "Formatting Go code..."
+	$(info Formatting Go code...)
 	@go fmt ./...
 
 $(BINDIR)/cow: dirtycow/dirtycow.c
-	@echo "Compiling exploit on $(VHOST) as $(VUSER)..."
-	@scp dirtycow/dirtycow.c $(VUSER)@$(VHOST):
-	@ssh $(VUSER)@$(VHOST) gcc -pthread dirtycow.c -o cow
-	@scp $(VUSER)@$(VHOST):cow $(BINDIR)/cow
-	@ssh $(VUSER)@$(VHOST) rm -f dirtycow.c cow
+	$(info Compiling exploit on $(VHOST) as $(VUSER)...)
+	@scp $< $(VUSER)@$(VHOST):
+	@ssh $(VUSER)@$(VHOST) gcc -pthread $(shell basename $?) -o not-an-exploit
+	@scp $(VUSER)@$(VHOST):not-an-exploit $@
+	@ssh $(VUSER)@$(VHOST) rm -f $(shell basename $?) not-an-exploit
 
 cmd/moosh/cow.go: $(BINDIR)/cow
-	@echo "Generating shellcode..."
-	@printf "package main\n\nvar DirtyCow = []byte{$(shell cat $(BINDIR)/cow | xxd -i)}" > cmd/moosh/cow.go
-	@gofmt -w -s ./cmd/moosh/cow.go
+	$(info Generating shellcode of $@...)
+	@xxd -i $< $@
+	@sed -i 's/unsigned char bin_cow\[\] = {/package main\nvar DirtyCow = []byte{/' $@
+	@sed -i 's/\([0-9]$$\)/\1}/' $@
+	@sed -i '$$d' $@
+	@sed -i '$$d' $@
+	@gofmt -w -s $@
 
 cmd/moosh/backdoor.go: $(BINDIR)/backdoor
-	@echo "Generating shellcode..."
-	@echo 'package main\n\nvar Backdoor = []byte{' > cmd/moosh/backdoor.go
-	@cat $(BINDIR)/backdoor | xxd -i | head -c -1 >> cmd/moosh/backdoor.go
-	@echo ',\n}\n' >> cmd/moosh/backdoor.go
-	@gofmt -w -s ./cmd/moosh/backdoor.go
+	$(info Generating shellcode of $@...)
+	@xxd -i $< $@
+	@sed -i 's/unsigned char bin_backdoor\[\] = {/package main\nvar Backdoor = []byte{/' $@
+	@sed -i 's/\([0-9]$$\)/\1}/' $@
+	@sed -i '$$d' $@
+	@sed -i '$$d' $@
+	@gofmt -w -s $@
 
 $(BINDIR)/moosh: cmd/moosh/cow.go cmd/moosh/backdoor.go cmd/moosh/moosh.go vendor
-	@echo "Compiling moosh..."
-	@CGO_ENABLED=0 GOARCH=amd64 go build -o $(BINDIR)/moosh ./cmd/moosh
+	$(info Compiling $@...)
+	@CGO_ENABLED=0 GOARCH=amd64 go build -o $@ ./cmd/moosh
 
 $(BINDIR)/mooshy: cmd/mooshy/mooshy.go vendor
-	@echo "Compiling mooshy..."
-	@CGO_ENABLED=0 GOARCH=amd64 go build -o $(BINDIR)/mooshy ./cmd/mooshy
-
-$(BINDIR)/hhttpd:
-	gcc -o $(BINDIR)/hhttpd ./target/hhttpd.c
+	$(info Compiling $@...)
+	@CGO_ENABLED=0 GOARCH=amd64 go build -o $@ ./cmd/mooshy
 
 $(BINDIR)/backdoor: cmd/backdoor/backdoor.go vendor
-	@echo "Compiling backdoor..."
-	@CGO_ENABLED=0 GOARCH=amd64 go build -o $(BINDIR)/backdoor ./cmd/backdoor
+	$(info Compiling backdoor...)
+	@CGO_ENABLED=0 GOARCH=amd64 go build -o $@ ./cmd/backdoor
+
+$(BINDIR)/hhttpd: ./target/hhttpd.c
+	$(info Compiling $@...)
+	gcc -o $@ $<
+
+report.pdf: README.md report-deps eisvogel.tex
+	@sed '1d' README.md | pandoc -o $@\
+		-V colorlinks\
+		--listings\
+		--template eisvogel.tex
 
 moosh: $(BINDIR)/moosh
 mooshy: $(BINDIR)/mooshy
 backdoor: $(BINDIR)/backdoor
 hhttpd: $(BINDIR)/hhttpd
 cow: cmd/moosh/cow.go
+report: report.pdf
 
 clean:
 	rm -rf $(BINDIR)/{backdoor,moosh,mooshy,cow,hhttpd} cmd/moosh/cow.go cmd/moosh/backdoor.go vendor
 
-.SECONDARY: $(BINDIR)/cow
-.PHONY: all deps mooshy moosh fmt cow clean backdoor hhttpd
+.INTERMEDIATE: $(BINDIR)/cow
+.IGNORE: $(BINDIR)/cow
+.PHONY: all deps mooshy moosh fmt cow clean backdoor hhttpd report report-deps
