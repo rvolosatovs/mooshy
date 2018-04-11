@@ -10,6 +10,10 @@ Mooshy is a tool that automates the infection and execution of arbitrary code on
 ## Installation:
 ```sh
     go get -u -v github.com/rvolosatovs/mooshy/cmd/mooshy
+```
+
+## Development:
+```sh
     make
 ```
 
