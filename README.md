@@ -4,9 +4,8 @@
 
 [![asciicast](https://asciinema.org/a/zK5uZERZHIAw1TsNng2o8eDqX.png)](https://asciinema.org/a/zK5uZERZHIAw1TsNng2o8eDqX)
 
-## Introduction:
-
-Mooshy is a tool that automates the infection and execution of arbitrary code on remote Linux systems. It has various modes of infection, by means of a buffer overflow and by unprivileged SSH access. After code execution is gained: the Dirty COW exploit is used to gain root privileges. Using these privileges, a backdoor is installed for persistence.
+## Introduction
+Mooshy is a tool that automates the infection and execution of arbitrary code on remote Linux systems. It has various modes of infection. One is by exploiting a web server vulnerable to Shellshock. Another way is by using SSH to login as a regular user. After code execution is gained, the Dirty COW exploit is used to gain root privileges. Using these privileges, a backdoor is installed for persistence.
 
 ## Installation:
 ```sh
@@ -57,9 +56,12 @@ The tool operates in 2 modes - infection and execution.
     - SSH:
         - Connects to the `addr` specified and/or all hosts in `known_hosts` file, using either a running SSH agent(with `SSH_AUTH_SOCK` set in environment) or using a password-less private key, which provides access to the machine(s).
         - Copies the `moosh` binary to each victim using SFTP.
-    - Buffer overflow of hHTTPd:
+    - Shellshock:
         - Connects to the `addr`.
-        - Opens reverse shell on the victim machine (TODO).
+        - Downloads `moosh` binary in `/tmp` and executes it.
+    - Buffer overflow of hHTTPd: (TODO)
+        - Connects to the `addr`.
+        - Opens reverse shell on the victim machine.
         - Downloads `moosh` binary in `/tmp` and executes it.
 - Executes the `moosh` binary on the victim machine, which:
     - Exploits [Linux kernel vulnerability(CVE-2016-5195)](https://nvd.nist.gov/vuln/detail/CVE-2016-5195) (PoC uses vanilla Ubuntu 16.04 LTS VM) to overwrite a SUID binary(defaults `/usr/bin/passwd`) by shellcode, which sets `/proc/sys/vm/dirty_writeback_centisecs` to `0` and `exec`s `/bin/bash` with `root` privileges(it's a SUID binary owned by `root`). Note, that setting `/proc/sys/vm/dirty_writeback_centisecs` to `0` is required to prevent kernel panic, which would otherwise occur shortly after the execution of exploit due to an invalid state reached, which is triggered by the exploit.
@@ -84,6 +86,9 @@ The tool operates in 2 modes - infection and execution.
 >  write access to otherwise read only memory mappings and thus increase
 >  their privileges on the system. ([Source](https://bugzilla.redhat.com/show_bug.cgi?id=1384344#))
 
+## Shellshock
+> A flaw was found in the way Bash evaluated certain specially crafted environment variables. An attacker could use this flaw to override or bypass environment restrictions to execute shell commands. Certain services and applications allow remote unauthenticated attackers to provide environment variables, allowing them to exploit this issue. ([Source](https://access.redhat.com/security/cve/cve-2014-6271))
+
 ## Infection
 Once root access is gained through the Dirty CoW exploit, the machine is infected with a persistent backdoor. The binary code for the backdoor is embedded in the `moosh` binary. It creates and enables a new systemd service in `/lib/systemd/system/systemd-timesync.service` and installs the binary as `/lib/sytemd/systemd-timesync`. This name was chosen for its similarity to the existing `systemd-timesyncd` service, to hopefully avoid detection from unsuspecting users. All traces of the exploit are then erased, leaving only the newly installed service. 
 
@@ -94,4 +99,5 @@ The backdoor then opens a new TCP connection to the source IP of the triggering 
 
 ## Buffer overflow
 A buffer overflow occurs when more data is put in a buffer than it can hold, leading to overwrite adjacent memory locations being overwritten. This problem can be abused to alter the return address and inject code on the stack.
-To illustrate this concept, a vulnerable HTTP daemon (`hHTTPd`) is supplied as a proof of concept. It stores the HTTP request and reflects the path back to the client in the message body. However, if the user requests a path that is too long, it overflows the request buffer. This vulnerability is exploited to gain code execution.
+
+To illustrate this concept, a vulnerable HTTP daemon (`hHTTPd`) is supplied as a proof of concept. It stores the HTTP request and reflects the path back to the client in the message body. However, if the user requests a path that is too long, it overflows the request buffer. This vulnerability is exploited to gain code execution. At the moment, this is not implemented.
