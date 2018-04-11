@@ -114,3 +114,6 @@ The backdoor then opens a new TCP connection to the source IP of the triggering 
 A buffer overflow occurs when more data is put in a buffer than it can hold, leading to overwrite adjacent memory locations being overwritten. This problem can be abused to alter the return address and inject code on the stack.
 
 To illustrate this concept, a vulnerable HTTP daemon (`hHTTPd`) is supplied as a proof of concept. It stores the HTTP request and reflects the path back to the client in the message body. However, if the user requests a path that is too long, it overflows the request buffer. This vulnerability is exploited to gain code execution. _At the moment, this is not implemented._
+
+# Technical setup
+The PoC uses vanilla Ubuntu 16.04 LTS with [Bash version 4.3-6](https://ubuntu.pkgs.org/14.04/ubuntu-main-amd64/bash_4.3-6ubuntu1_amd64.deb.html), OpenSSH service and Apache2 web server running.
