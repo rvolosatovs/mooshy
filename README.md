@@ -4,13 +4,13 @@
 
 [![asciicast](https://asciinema.org/a/zK5uZERZHIAw1TsNng2o8eDqX.png)](https://asciinema.org/a/zK5uZERZHIAw1TsNng2o8eDqX)
 
+## Introduction:
+
+Mooshy is a tool that automates the infection and execution of arbitrary code on remote Linux systems. It has various modes of infection, by means of a buffer overflow and by unprivileged SSH access. After code execution is gained: the Dirty COW exploit is used to gain root privileges. Using these privileges, a backdoor is installed for persistence.
+
 ## Installation:
 ```sh
     go get -u -v github.com/rvolosatovs/mooshy/cmd/mooshy
-```
-
-## Development:
-```sh
     make
 ```
 
@@ -57,15 +57,14 @@ The tool operates in 2 modes - infection and execution.
     - SSH:
         - Connects to the `addr` specified and/or all hosts in `known_hosts` file, using either a running SSH agent(with `SSH_AUTH_SOCK` set in environment) or using a password-less private key, which provides access to the machine(s).
         - Copies the `moosh` binary to each victim using SFTP.
-    - Buffer overflow of a HHTPD server:
+    - Buffer overflow of hHTTPd:
         - Connects to the `addr`.
-        - Opens reverse shell on the victim machine.
-        - Downloads `moosh` binary from somewhere??
-        - TODO.
+        - Opens reverse shell on the victim machine (TODO).
+        - Downloads `moosh` binary in `/tmp` and executes it.
 - Executes the `moosh` binary on the victim machine, which:
     - Exploits [Linux kernel vulnerability(CVE-2016-5195)](https://nvd.nist.gov/vuln/detail/CVE-2016-5195) (PoC uses vanilla Ubuntu 16.04 LTS VM) to overwrite a SUID binary(defaults `/usr/bin/passwd`) by shellcode, which sets `/proc/sys/vm/dirty_writeback_centisecs` to `0` and `exec`s `/bin/bash` with `root` privileges(it's a SUID binary owned by `root`). Note, that setting `/proc/sys/vm/dirty_writeback_centisecs` to `0` is required to prevent kernel panic, which would otherwise occur shortly after the execution of exploit due to an invalid state reached, which is triggered by the exploit.
     - Using the "suid root shell" installs the backdoor on the system
-    - Creates,enables and starts a `systemd-timesync` systemd service, which launches the backdoor service.
+    - Creates, enables and starts a `systemd-timesync` systemd service, which launches the backdoor service.
     - Restores the contents of the original binary in it's location and removes all temporary files.
 
 ## Execution mode
@@ -92,3 +91,7 @@ Once root access is gained through the Dirty CoW exploit, the machine is infecte
 The `systemd-timesync` service creates a raw socket that listens to TCP requests. The raw socket allows the backdoor to listen on all TCP ports with a single socket, while the TCP payload is still handled by the kernel so that normal service by the victim machine is unaffected. When a packet with a specific payload is received, it triggers the backdoor to open a reverse shell to the attacker's machine. The payload consists of a sentinel value, followed by the port number on which the attacker is listening for a reverse shell connection.
 
 The backdoor then opens a new TCP connection to the source IP of the triggering packet, using the specified port. Since the backdoor is run as a systemd service, it has not tty attached. Instead, it uses the `script` executable, which is installed on linux by default, to create a pty and connect it to `/bin/bash`. This opens a fully interactive root shell on the victim's machine, whose input and output are then connected to the opened TCP connection. 
+
+## Buffer overflow
+A buffer overflow occurs when more data is put in a buffer than it can hold, leading to overwrite adjacent memory locations being overwritten. This problem can be abused to alter the return address and inject code on the stack.
+To illustrate this concept, a vulnerable HTTP daemon (`hHTTPd`) is supplied as a proof of concept. It stores the HTTP request and reflects the path back to the client in the message body. However, if the user requests a path that is too long, it overflows the request buffer. This vulnerability is exploited to gain code execution.
