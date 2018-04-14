@@ -1,4 +1,4 @@
-[![Build Status](https://travis-ci.com/rvolosatovs/mooshy.svg?token=Rr1zHeZEE84zs4P7sgSv&branch=master)](https://travis-ci.com/rvolosatovs/mooshy)
+[![Build Status](https://travis-ci.org/rvolosatovs/mooshy.svg?branch=master)](https://travis-ci.org/rvolosatovs/mooshy)
 
 # Mooshy
 
