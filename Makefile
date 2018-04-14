@@ -27,7 +27,7 @@ fmt:
 	$(info Formatting Go code...)
 	@go fmt ./...
 
-$(BINDIR)/cow: dirtycow/dirtycow.c
+$(BINDIR)/cow-linux-amd64: dirtycow/dirtycow.c
 ifdef VHOST
 	$(info Compiling exploit on $(VHOST) as $(VUSER)...)
 	@scp $< $(VUSER)@$(VHOST):
@@ -39,19 +39,19 @@ else
 	@gcc -pthread $< -o $@
 endif
 
-cmd/moosh/cow.go: $(BINDIR)/cow
+cmd/moosh/cow.go: $(BINDIR)/cow-linux-amd64
 	$(info Generating shellcode of $@...)
 	@xxd -i $< $@
-	@sed -i 's/unsigned char bin_cow\[\] = {/package main\nvar DirtyCow = []byte{/' $@
+	@sed -i 's/unsigned char $(subst -,_,$(subst /,_,$<))\[\] = {/package main\nvar DirtyCow = []byte{/' $@
 	@sed -i 's/\([0-9]$$\)/\1}/' $@
 	@sed -i '$$d' $@
 	@sed -i '$$d' $@
 	@gofmt -w -s $@
 
-cmd/moosh/backdoor.go: $(BINDIR)/backdoor
+cmd/moosh/backdoor.go: $(BINDIR)/backdoor-linux-amd64
 	$(info Generating shellcode of $@...)
 	@xxd -i $< $@
-	@sed -i 's/unsigned char bin_backdoor\[\] = {/package main\nvar Backdoor = []byte{/' $@
+	@sed -i 's/unsigned char $(subst -,_,$(subst /,_,$<))\[\] = {/package main\nvar Backdoor = []byte{/' $@
 	@sed -i 's/\([0-9]$$\)/\1}/' $@
 	@sed -i '$$d' $@
 	@sed -i '$$d' $@
@@ -91,8 +91,6 @@ hhttpd: $(BINDIR)/hhttpd-linux-amd64
 report: report.pdf
 
 clean:
-	rm -rf $(BINDIR)/{backdoor,moosh,mooshy,cow,hhttpd} cmd/moosh/cow.go cmd/moosh/backdoor.go vendor
+	rm -rf $(BINDIR)/{backdoor,moosh,mooshy,cow,hhttpd}-linux-amd64* cmd/moosh/cow.go cmd/moosh/backdoor.go vendor
 
-.INTERMEDIATE: $(BINDIR)/cow
-.IGNORE: $(BINDIR)/cow
 .PHONY: all mooshy moosh backdoor hhttpd deps fmt clean report report-deps
