@@ -1,3 +1,9 @@
 language: go
+
+sudo: required
+
+install:
+  - sudo apt install upx-ucl
+
 before_script:
   - make deps
