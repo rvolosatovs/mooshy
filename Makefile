@@ -57,22 +57,22 @@ cmd/moosh/backdoor.go: $(BINDIR)/backdoor
 	@sed -i '$$d' $@
 	@gofmt -w -s $@
 
-$(BINDIR)/moosh: cmd/moosh/cow.go cmd/moosh/backdoor.go cmd/moosh/moosh.go vendor
+$(BINDIR)/moosh-linux-amd64: cmd/moosh/cow.go cmd/moosh/backdoor.go cmd/moosh/moosh.go vendor
 	$(info Compiling $@...)
 	@$(GOBUILD) -o $@ ./cmd/moosh
 	@$(UPX) $@
 
-$(BINDIR)/mooshy: cmd/mooshy/mooshy.go vendor
+$(BINDIR)/mooshy-linux-amd64: cmd/mooshy/mooshy.go vendor
 	$(info Compiling $@...)
 	@$(GOBUILD) -o $@ ./cmd/mooshy
 	@$(UPX) $@
 
-$(BINDIR)/backdoor: cmd/backdoor/backdoor.go vendor
+$(BINDIR)/backdoor-linux-amd64: cmd/backdoor/backdoor.go vendor
 	$(info Compiling backdoor...)
 	@$(GOBUILD) -o $@ ./cmd/backdoor
 	@$(UPX) $@
 
-$(BINDIR)/hhttpd: ./target/hhttpd.c
+$(BINDIR)/hhttpd-linux-amd64: ./target/hhttpd.c
 	$(info Compiling $@...)
 	gcc -o $@ $<
 	@$(UPX) $@
@@ -83,11 +83,11 @@ report.pdf: README.md report-deps eisvogel.tex
 		--listings\
 		--template eisvogel.tex
 
-moosh: $(BINDIR)/moosh
-mooshy: $(BINDIR)/mooshy
-backdoor: $(BINDIR)/backdoor
-hhttpd: $(BINDIR)/hhttpd
-cow: cmd/moosh/cow.go
+moosh: $(BINDIR)/moosh-linux-amd64
+mooshy: $(BINDIR)/mooshy-linux-amd64
+backdoor: $(BINDIR)/backdoor-linux-amd64
+hhttpd: $(BINDIR)/hhttpd-linux-amd64
+
 report: report.pdf
 
 clean:
@@ -95,4 +95,4 @@ clean:
 
 .INTERMEDIATE: $(BINDIR)/cow
 .IGNORE: $(BINDIR)/cow
-.PHONY: all deps mooshy moosh fmt cow clean backdoor hhttpd report report-deps
+.PHONY: all mooshy moosh backdoor hhttpd deps fmt clean report report-deps
