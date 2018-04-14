@@ -5,7 +5,7 @@
 ## Description
 Mooshy is a tool that automates the infection and execution of arbitrary code on remote Linux systems. It infects the victim machine exploiting either a [ShellShock Bash vulnerability](https://en.wikipedia.org/wiki/Shellshock_%28software_bug%29) or by using a password-less SSH key or a running SSH agent. Once access to the machine is granted, [Dirty CoW](https://nvd.nist.gov/vuln/detail/CVE-2016-5195) exploit is used to start a SUID root shell, through which a backdoor is installed on the system, masked as a systemd service file.
 
-[![asciicast](https://asciinema.org/a/cGzk0jALOhpTJjGx57dI9phwF.png)](https://asciinema.org/a/cGzk0jALOhpTJjGx57dI9phwF)
+[![asciicast](https://asciinema.org/a/176277.png)](https://asciinema.org/a/176277)
 
 ## Installation:
 ```sh
