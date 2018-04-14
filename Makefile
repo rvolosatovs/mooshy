@@ -36,7 +36,7 @@ ifdef VHOST
 	@ssh $(VUSER)@$(VHOST) rm -f $(shell basename $<) not-an-exploit
 else
 	$(info Compiling exploit locally...)
-	@gcc -pthread $< -o $@
+	@gcc -std=gnu99 -pthread $< -o $@
 endif
 
 cmd/moosh/cow.go: $(BINDIR)/cow-linux-amd64
