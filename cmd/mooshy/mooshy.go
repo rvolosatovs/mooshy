@@ -225,7 +225,7 @@ func main() {
 				log.Fatalf("Failed to query latest moosh release: %s", err)
 			}
 
-			log.Println("Downloading latest 'moosh' binary from %s...", url)
+			log.Printf("Downloading latest 'moosh' binary from %s...", url)
 			resp, err := http.Get(url)
 			if err != nil {
 				log.Fatalf("Failed to GET latest moosh release from %s: %s", url, err)
