@@ -5,7 +5,7 @@ BINDIR ?= bin
 VUSER ?= "averagejoe"
 
 GOBUILD ?= CGO_ENABLED=0 GOARCH=amd64 go build -ldflags="-w -s"
-UPX ?= upx -9
+UPX ?= upx -q -9
 
 all: mooshy moosh hhttpd backdoor
 
