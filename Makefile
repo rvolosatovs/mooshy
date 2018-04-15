@@ -74,8 +74,7 @@ $(BINDIR)/backdoor-linux-amd64: cmd/backdoor/backdoor.go vendor
 
 $(BINDIR)/hhttpd-linux-amd64: ./target/hhttpd.c
 	$(info Compiling $@...)
-	gcc -o $@ $<
-	@$(UPX) $@
+	gcc -m32 -fno-stack-protector -z execstack -o $@ $<
 
 report.pdf: README.md report-deps eisvogel.tex
 	@sed '1d' README.md | pandoc -o $@\

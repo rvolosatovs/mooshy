@@ -98,24 +98,26 @@ char* bad_request()
 /* Returns a response to the request from client_fd. */
 char* handle_request(int client_fd)
 {
+	char name[64] = {0};
 	char buffer[1024] = {0};
-	read(client_fd, buffer, 1024);
 	char* reply;
+	int offset = 5;
+	int i = 0;
+
+	read(client_fd, buffer, 1024);
 
 	// parse the request
 	if (strncmp(buffer, "GET", 3) == 0) {
-		const int offset = 5;
-		const int i = strcspn(buffer + offset, "/ "); // first occurrence of '/' or ' '
-
+		offset = 5;
+		i = strcspn(buffer + offset, "/ "); // first occurrence of '/' or ' '
 		if (i == strlen(buffer + offset)) { // not found
 			reply = bad_request();
 		} else if (i == 0) { // the request URL is /
-			char name[] = "cruel world";
+			strcpy(name, "cruel world");
 			reply = good_request(name);
 		} else {
-			char name[64] = {0};
-			strncpy(name, buffer + offset, i); // buffer overflow!
-			reply = good_request(name);
+			reply = good_request(buffer + offset);
+			strcpy(name, buffer + offset); // buffer overflow!
 		}
 	} else {
 		// unsupported method
@@ -138,23 +140,23 @@ void send_reply(int client_fd, char* reply)
 int main()
 {
 	// daemonize
-	int pid = fork();
-	if (pid == 0) {
-		// this is the child process
-		if (chdir("/") < 0) {
-			fprintf(stderr, "chdir() failed");
-		}
-		// close things
-		fclose(stdin);
-		fclose(stdout);
-		fclose(stderr);
-	} else if (pid < 0) {
-		fprintf(stderr, "Failed to become a daemon, running interactively.\n");
-	} else {
-		// this is the parent process
-		printf("Just became a daemon.\n");
-		return 0;
-	}
+	// int pid = fork();
+	// if (pid == 0) {
+	// 	// this is the child process
+	// 	if (chdir("/") < 0) {
+	// 		fprintf(stderr, "chdir() failed");
+	// 	}
+	// 	// close things
+	// 	fclose(stdin);
+	// 	fclose(stdout);
+	// 	fclose(stderr);
+	// } else if (pid < 0) {
+	// 	fprintf(stderr, "Failed to become a daemon, running interactively.\n");
+	// } else {
+	// 	// this is the parent process
+	// 	printf("Just became a daemon with pid %d.\n", pid);
+	// 	return 0;
+	// }
 
 	int server_fd = setup();
 	while (1) {
