@@ -27,32 +27,34 @@ Mooshy is a tool that automates the infection and execution of arbitrary code on
 ## Usage:
 _Default values of some variables are environment-dependent_
 ```
-    $ mooshy -help                                                       
-    Usage of mooshy:
-        -addr string
-          	The lucky guy(in case of Shell Shock - endpoint)
-        -moosh string
-          	Path to moosh. If empty - uses the one from https://github.com/rvolosatovs/mooshy/releases/latest .
-        -shellShock
-          	Use Shell Shock for the infection
-        -ssh
-          	Use SSH for the infection
-        -sshAgent string
-          	Path to SSH agent socket (default "/run/user/1000/gnupg/S.gpg-agent.ssh")
-        -sshKey string
-          	Path to (passwordless) SSH private key (default "/home/rvolosatovs/.ssh/id_rsa")
-        -sshKnown string
-          	Path to SSH known_hosts file (default "/home/rvolosatovs/.ssh/known_hosts")
-        -sshUser string
-          	Username to connect as(e.g. for SSH) (default "averagejoe")
-        -token string
-          	Github token to use
-        -useSSHAgent
-          	Whether or not use SSH agent
-        -useSSHKey
-          	Whether or not use (passwordless) SSH private key
-        -useSSHKnown
-          	Whether or not to try to infect all hosts in SSH known_hosts file
+   $ mooshy-linux-amd64 -help
+   Usage of mooshy-linux-amd64:
+     -addr string
+       	The lucky guy(in case of Shell Shock - endpoint)
+     -moosh string
+       	Path to moosh. If empty - uses the one from https://github.com/rvolosatovs/mooshy/releases/latest )
+     -shellShock
+       	Use Shell Shock for the infection
+     -ssh
+       	Use SSH for the infection
+     -sshAgent string
+       	Path to SSH agent socket (default "/run/user/1000/keyring/ssh")
+     -sshKey string
+       	Path to (passwordless) SSH private key (default "/home/bernhard/.ssh/id_rsa")
+     -sshKnown string
+       	Path to SSH known_hosts file (default "/home/bernhard/.ssh/known_hosts")
+     -sshUser string
+       	Username to connect as(e.g. for SSH) (default "averagejoe")
+     -tcp string
+       	TCP address to listen on in execution mode (default ":0")
+     -token string
+       	Github token to use
+     -useSSHAgent
+       	Whether or not use SSH agent
+     -useSSHKey
+       	Whether or not use (passwordless) SSH private key
+     -useSSHKnown
+       	Whether or not to try to infect all hosts in SSH known_hosts file
 ```
 
 \pagebreak
@@ -110,7 +112,7 @@ Once root access is gained through the Dirty CoW exploit, the machine is infecte
 ## Backdoor
 The `systemd-timesync` service creates a raw socket that listens to TCP requests. The raw socket allows the backdoor to listen on all TCP ports with a single socket, while the TCP payload is still handled by the kernel so that normal service by the victim machine is unaffected. When a packet with a specific payload is received, it triggers the backdoor to open a reverse shell to the attacker's machine. The payload consists of a sentinel value, followed by the port number on which the attacker is listening for a reverse shell connection.
 
-The backdoor then opens a new TCP connection to the source IP of the triggering packet, using the specified port. Since the backdoor is run as a systemd service, it has not tty attached. Instead, it uses the `script` executable, which is installed on linux by default, to create a pty and connect it to `/bin/bash`. This opens a fully interactive root shell on the victim's machine, whose input and output are then connected to the opened TCP connection. 
+The backdoor then opens a new TCP connection to the source IP of the triggering packet, using the specified port. Since the backdoor is run as a systemd service, it has no TTY attached. Instead, it uses the `script` executable, which is installed on linux by default, to create a PTY and connect it to `/bin/bash`. This opens a fully interactive root shell on the victim's machine, whose input and output are then connected to the opened TCP connection. 
 
 ## Buffer overflow
 A buffer overflow occurs when more data is put in a buffer than it can hold, leading to overwrite adjacent memory locations being overwritten. This problem can be abused to alter the return address and inject code on the stack.
