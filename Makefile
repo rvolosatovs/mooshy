@@ -73,8 +73,16 @@ $(BINDIR)/backdoor-linux-amd64: cmd/backdoor/backdoor.go vendor
 	@$(UPX) $@
 
 $(BINDIR)/hhttpd-linux-amd64: ./target/hhttpd.c
-	$(info Compiling $@...)
-	gcc -m32 -fno-stack-protector -z execstack -o $@ $<
+ifdef VHOST
+	$(info Compiling hhttpd on $(VHOST) as $(VUSER)...)
+	@scp $< $(VUSER)@$(VHOST):
+	@ssh $(VUSER)@$(VHOST) gcc -fno-stack-protector -z execstack -m32 $(shell basename $<) -o hhttpd
+	@scp $(VUSER)@$(VHOST):hhttpd $@
+	@ssh $(VUSER)@$(VHOST) rm -f $(shell basename $<) hhttpd
+else
+	$(info Compiling hhttpd locally...)
+	@gcc -fno-stack-protector -z execstack -m32 $< -o $@
+endif
 
 report.pdf: README.md report-deps eisvogel.tex
 	@sed '1d' README.md | pandoc -o $@\
