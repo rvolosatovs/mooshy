@@ -6,7 +6,7 @@ cgi=/usr/lib/cgi-bin
 f=`mktemp`
 curl -sLo ${f} http://archive.ubuntu.com/ubuntu/pool/main/b/bash/bash_4.3-6ubuntu1_amd64.deb && dpkg -i ${f} && rm -f ${f}
 
-apt-get install apache2
+apt-get -y install apache2
 
 sed -i 's/#\(.*Include.*cgi-bin\)/\1/' /etc/apache2/sites-enabled/000-default.conf
 
@@ -20,5 +20,7 @@ echo "Content-type: text/plain"
 echo
 echo "Hello, cruel world!"
 EOF
+
+chmod +x ${cgi}/${1:-"index"}.cgi
 
 systemctl restart apache2
