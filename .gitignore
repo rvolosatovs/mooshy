@@ -2,3 +2,5 @@ bin
 known_hosts
 vendor
 *.pdf
+doc/slides/reveal.js
+*.html
