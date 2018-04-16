@@ -76,9 +76,7 @@ char* good_request(char* buffer, int i)
 		perror("malloc");
 		exit(EXIT_FAILURE);
 	}
-	// sprintf(msg, "Hello, %s!\n", buffer);
 	snprintf(reply, rsize, "%s\r\n%s\r\n%s%hu\r\n\r\n", HTTP200, CTYPE, CLENGTH, msgsize);
-	// snprintf(msg, msgsize + 1, "Hello, %s!\n", buffer);
 	strncpy(msg + strlen(msg), buffer, i);
 	strncpy(msg + strlen(msg), "!\n", 3);
 	memcpy(reply + strlen(reply), msg, strlen(msg) + 1);

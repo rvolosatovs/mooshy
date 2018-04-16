@@ -1,3 +1,4 @@
+; Adapted from https://www.exploit-db.com/exploits/39389/
 section .text
     global _start
 
