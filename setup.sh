@@ -23,7 +23,7 @@ EOF
 
 chmod +x ${cgi}/index.cgi
 
-curl --create-dirs -sLo bin/hhttpd https://github.com/rvolosatovs/mooshy/releases/download/${1:-"v1.2.0"}/hhttpd-linux-amd64
-chmod +x bin/hhttpd
+curl --create-dirs -sLo ~/bin/hhttpd https://github.com/rvolosatovs/mooshy/releases/download/${1:-"v1.2.0"}/hhttpd-linux-amd64
+chmod +x ~/bin/hhttpd
 
 systemctl restart apache2
