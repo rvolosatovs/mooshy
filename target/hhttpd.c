@@ -64,20 +64,24 @@ int recv_request(int server_fd)
 }
 
 /* Returns an HTTP 200 response with a greeting. */
-char* good_request(char* name)
+char* good_request(char* buffer, int i)
 {
-	const unsigned short msgsize = strlen("Hello, !\n") + strlen(name) + 1;
-	char msg[msgsize];
+	const unsigned short msgsize = strlen("Hello, !\n") + i;
+	char msg[64] = "Hello, ";
 
-	snprintf(msg, msgsize, "Hello, %s!\n", name);
 	const int rsize = strlen(HTTP200) + strlen(CTYPE) + strlen(CLENGTH) + sizeof(
-			unsigned short) + strlen(msg) + 9; // 9 = 4*(\n\r) + 1*\0
+			unsigned short) + msgsize + 9; // 9 = 4*(\n\r) + 1*\0
 	char* reply = malloc(rsize);
 	if (!reply) {
 		perror("malloc");
 		exit(EXIT_FAILURE);
 	}
-	snprintf(reply, rsize, "%s\r\n%s\r\n%s%hu\r\n\r\n%s\n", HTTP200, CTYPE, CLENGTH, msgsize, msg);
+	// sprintf(msg, "Hello, %s!\n", buffer);
+	snprintf(reply, rsize, "%s\r\n%s\r\n%s%hu\r\n\r\n", HTTP200, CTYPE, CLENGTH, msgsize);
+	// snprintf(msg, msgsize + 1, "Hello, %s!\n", buffer);
+	strncpy(msg + strlen(msg), buffer, i);
+	strncpy(msg + strlen(msg), "!\n", 3);
+	memcpy(reply + strlen(reply), msg, strlen(msg) + 1);
 	return reply;
 }
 
@@ -109,15 +113,14 @@ char* handle_request(int client_fd)
 	// parse the request
 	if (strncmp(buffer, "GET", 3) == 0) {
 		offset = 5;
-		i = strcspn(buffer + offset, "/ "); // first occurrence of '/' or ' '
+		i = strcspn(buffer + offset, " "); // first occurrence of ' '
 		if (i == strlen(buffer + offset)) { // not found
 			reply = bad_request();
 		} else if (i == 0) { // the request URL is /
 			strcpy(name, "cruel world");
-			reply = good_request(name);
+			reply = good_request(name, strlen(name));
 		} else {
-			reply = good_request(buffer + offset);
-			strcpy(name, buffer + offset); // buffer overflow!
+			reply = good_request(buffer + offset, i);
 		}
 	} else {
 		// unsupported method
@@ -140,23 +143,23 @@ void send_reply(int client_fd, char* reply)
 int main()
 {
 	// daemonize
-	// int pid = fork();
-	// if (pid == 0) {
-	// 	// this is the child process
-	// 	if (chdir("/") < 0) {
-	// 		fprintf(stderr, "chdir() failed");
-	// 	}
-	// 	// close things
-	// 	fclose(stdin);
-	// 	fclose(stdout);
-	// 	fclose(stderr);
-	// } else if (pid < 0) {
-	// 	fprintf(stderr, "Failed to become a daemon, running interactively.\n");
-	// } else {
-	// 	// this is the parent process
-	// 	printf("Just became a daemon with pid %d.\n", pid);
-	// 	return 0;
-	// }
+	int pid = fork();
+	if (pid == 0) {
+		// // this is the child process
+		// if (chdir("/") < 0) {
+		// 	fprintf(stderr, "chdir() failed");
+		// }
+		// // close things
+		// fclose(stdin);
+		// fclose(stdout);
+		// fclose(stderr);
+	} else if (pid < 0) {
+		fprintf(stderr, "Failed to become a daemon, running interactively.\n");
+	} else {
+		// this is the parent process
+		printf("Just became a daemon with pid %d.\n", pid);
+		return 0;
+	}
 
 	int server_fd = setup();
 	while (1) {
