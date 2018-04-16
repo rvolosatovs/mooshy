@@ -27,3 +27,5 @@ curl --create-dirs -sLo /usr/local/bin/hhttpd https://github.com/rvolosatovs/moo
 chmod +x /usr/local/bin/hhttpd
 
 systemctl restart apache2
+
+echo 0 > /proc/sys/kernel/randomize_va_space
