@@ -27,34 +27,38 @@ Mooshy is a tool that automates the infection and execution of arbitrary code on
 ## Usage:
 _Default values of some variables are environment-dependent_
 ```
-   $ mooshy-linux-amd64 -help
-   Usage of mooshy-linux-amd64:
-     -addr string
-       	The lucky guy(in case of Shell Shock - endpoint)
-     -moosh string
-       	Path to moosh. If empty - uses the one from https://github.com/rvolosatovs/mooshy/releases/latest )
-     -shellShock
-       	Use Shell Shock for the infection
-     -ssh
-       	Use SSH for the infection
-     -sshAgent string
-       	Path to SSH agent socket (default "/run/user/1000/keyring/ssh")
-     -sshKey string
-       	Path to (passwordless) SSH private key (default "/home/bernhard/.ssh/id_rsa")
-     -sshKnown string
-       	Path to SSH known_hosts file (default "/home/bernhard/.ssh/known_hosts")
-     -sshUser string
-       	Username to connect as(e.g. for SSH) (default "averagejoe")
-     -tcp string
-       	TCP address to listen on in execution mode (default ":0")
-     -token string
-       	Github token to use
-     -useSSHAgent
-       	Whether or not use SSH agent
-     -useSSHKey
-       	Whether or not use (passwordless) SSH private key
-     -useSSHKnown
-       	Whether or not to try to infect all hosts in SSH known_hosts file
+$ mooshy -help
+  Usage of mooshy:
+    -addr string
+      	The lucky guy(in case of Shell Shock - endpoint)
+    -c string
+      	Command to run before shell start
+    -moosh string
+      	Path to moosh. If empty - uses the one from https://github.com/rvolosatovs/mooshy/releases/latest
+    -shellShock
+      	Use Shell Shock for the infection
+    -ssh
+      	Use SSH for the infection
+    -sshAgent string
+      	Path to SSH agent socket for SSH infection (default "/run/user/1000/gnupg/S.gpg-agent.ssh")
+    -sshKey string
+      	Path to (passwordless) SSH private key for SSH infection (default "/home/rvolosatovs/.ssh/id_rsa")
+    -sshKnown string
+      	Path to SSH known_hosts file for SSH infection (default "/home/rvolosatovs/.ssh/known_hosts")
+    -sshUser string
+      	Username to connect as using SSH infection (default "rvolosatovs")
+    -tcp string
+      	TCP address to listen on in execution mode (default ":0")
+    -token string
+      	Github token to use
+    -useSSHAgent
+      	Use SSH agent for SSH infection
+    -useSSHKey
+      	Use (passwordless) SSH private key for SSH infection
+    -useSSHKnown
+      	Infect all hosts in SSH known_hosts file using SSH infection
+    -wipe
+      	Wipe the backdoor in execution mode (The self-destructing script will be appended to pre)
 ```
 
 \pagebreak
@@ -121,3 +125,4 @@ To illustrate this concept, a vulnerable HTTP daemon (`hHTTPd`) is supplied as a
 
 # Technical setup
 The PoC uses vanilla Ubuntu 16.04 LTS with [Bash version 4.3-6](https://ubuntu.pkgs.org/14.04/ubuntu-main-amd64/bash_4.3-6ubuntu1_amd64.deb.html), OpenSSH service and Apache2 web server running.
+Setup script can be found at `./setup.sh`.

