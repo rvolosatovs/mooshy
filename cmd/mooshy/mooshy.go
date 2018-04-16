@@ -232,7 +232,7 @@ func main() {
 	moosh := flag.String("moosh", "", "Path to moosh. If empty - uses the one from https://github.com/rvolosatovs/mooshy/releases/latest")
 	addr := flag.String("addr", "", "The lucky guy(in case of Shell Shock - endpoint)")
 	pre := flag.String("c", "", "Command to run before shell start")
-	wipe := flag.Bool("wipe", false, "Wipe the backdoor in execution mode (The self-destructing script will be appended to pre)")
+	wipe := flag.Bool("wipe", false, "Wipe the backdoor in execution mode (The self-destructing script will be appended to '-c')")
 	tcp := flag.String("tcp", ":0", "TCP address to listen on in execution mode")
 	token := flag.String("token", "", "Github token to use")
 	flag.Parse()

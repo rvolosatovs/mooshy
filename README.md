@@ -58,7 +58,7 @@ $ mooshy -help
     -useSSHKnown
       	Infect all hosts in SSH known_hosts file using SSH infection
     -wipe
-      	Wipe the backdoor in execution mode (The self-destructing script will be appended to pre)
+      	Wipe the backdoor in execution mode (The self-destructing script will be appended to '-c')
 ```
 
 \pagebreak
