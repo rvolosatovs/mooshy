@@ -11,16 +11,19 @@ apt-get -y install apache2
 sed -i 's/#\(.*Include.*cgi-bin\)/\1/' /etc/apache2/sites-enabled/000-default.conf
 
 cd /etc/apache2/mods-enabled
-ln -s ../mods-available/cgi.load
+ln -sf ../mods-available/cgi.load
 
 mkdir -pv ${cgi}
-cat <<EOF >${cgi}/${1:-"index"}.cgi
+cat <<EOF >${cgi}/index.cgi
 #!/bin/bash
 echo "Content-type: text/plain"
 echo
 echo "Hello, cruel world!"
 EOF
 
-chmod +x ${cgi}/${1:-"index"}.cgi
+chmod +x ${cgi}/index.cgi
+
+curl --create-dirs -sLo bin/hhttpd https://github.com/rvolosatovs/mooshy/releases/download/${1:-"v1.2.0"}/hhttpd-linux-amd64
+chmod +x bin/hhttpd
 
 systemctl restart apache2

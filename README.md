@@ -31,6 +31,8 @@ $ mooshy -help
   Usage of mooshy:
     -addr string
       	The lucky guy(in case of Shell Shock - endpoint)
+    -bufferOverflow
+      	Use a buffer overflow for the infection
     -c string
       	Command to run before shell start
     -moosh string
@@ -71,6 +73,7 @@ The tool operates in 2 modes - infection and execution.
    mooshy -ssh -useSSHAgent -sshUser averagejoe -addr 192.168.56.102 # Specific SSH host
    mooshy -ssh -useSSHAgent -useSSHKnown -sshKnown known_hosts -sshUser averagejoe # SSH known_hosts
    mooshy -shellShock -addr http://192.168.56.102/cgi-bin/index.cgi # ShellShock
+   mooshy -bufferOverflow -addr 192.168.56.102:8080 # Buffer overflow
 ```
 - Connects to the victim machine(s) using either of:
     - SSH:
@@ -78,6 +81,8 @@ The tool operates in 2 modes - infection and execution.
         - Copies the `moosh` binary to each victim using SFTP.
     - Shellshock:
         - Sends a GET request to `addr` specified, with embedded script in `User-Agent` header, which downloads `moosh` binary using `curl` and makes it executable.
+    - Buffer overflow:
+        - Sends a GET request to the specified `addr`, containing a payload to exploit a buffer overflow in the `hHTTPd` server, which downloads the `moosh` binary using `wget` and executes it.
 - Executes the `moosh` binary on the victim machine, which:
     - Exploits [Linux kernel vulnerability(CVE-2016-5195)](https://nvd.nist.gov/vuln/detail/CVE-2016-5195) (PoC uses vanilla Ubuntu 16.04 LTS VM) to overwrite a SUID binary(defaults `/usr/bin/passwd`) by shellcode, which sets `/proc/sys/vm/dirty_writeback_centisecs` to `0` and `exec`s `/bin/bash` with `root` privileges(it's a SUID binary owned by `root`). Note, that setting `/proc/sys/vm/dirty_writeback_centisecs` to `0` is required to prevent kernel panic, which would otherwise occur shortly after the execution of exploit due to an invalid state reached, which is triggered by the exploit.
     - Using the "suid root shell" installs the backdoor on the system.
@@ -121,7 +126,7 @@ The backdoor then opens a new TCP connection to the source IP of the triggering 
 ## Buffer overflow
 A buffer overflow occurs when more data is put in a buffer than it can hold, leading to overwrite adjacent memory locations being overwritten. This problem can be abused to alter the return address and inject code on the stack.
 
-To illustrate this concept, a vulnerable HTTP daemon (`hHTTPd`) is supplied as a proof of concept. It stores the HTTP request and reflects the path back to the client in the message body. However, if the user requests a path that is too long, it overflows the request buffer. This vulnerability is exploited to gain code execution. _At the moment, this is not implemented._
+To illustrate this concept, a vulnerable HTTP daemon (`hHTTPd`) is supplied as a proof of concept. It stores the HTTP request and reflects the path back to the client in the message body. However, if the user requests a path that is too long, it overflows the request buffer. This vulnerability is exploited to gain code execution.
 
 # Technical setup
 The PoC uses vanilla Ubuntu 16.04 LTS with [Bash version 4.3-6](https://ubuntu.pkgs.org/14.04/ubuntu-main-amd64/bash_4.3-6ubuntu1_amd64.deb.html), OpenSSH service and Apache2 web server running.

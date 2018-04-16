@@ -3,7 +3,7 @@ language: go
 sudo: required
 
 install:
-  - sudo apt install upx-ucl
+  - sudo apt install upx-ucl libc6-dev-i386
 
 before_script:
   - make clean
