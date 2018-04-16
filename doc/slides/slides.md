@@ -17,12 +17,6 @@
 
 # 1. Infection
 
-## SSH
-* `$ mooshy -ssh -addr ...` _or_ `-sshKnown`
-* Uses regular SSH access
-* Connects to `addr` or addresses in `known_hosts` file
-* Copies and executes the `moosh` binary
-
 ## Shellshock
 * `$ mooshy -shellShock -addr ...`
 * CVE-2014-6271
@@ -34,6 +28,12 @@
 * Using buffer overflow in `hHTTPd`
 * Injects shellcode
 * Again, downloads `moosh` and executes it
+
+## SSH
+* `$ mooshy -ssh -addr ...` _or_ `-sshKnown`
+* Uses regular SSH access
+* Connects to `addr` or addresses in `known_hosts` file
+* Copies and executes the `moosh` binary
 
 # 2. Escalation
 
