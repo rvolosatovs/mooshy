@@ -411,7 +411,7 @@ func main() {
 		}
 		log.Printf("TCP socket opened on %s", l.Addr())
 
-		conn, err := net.Dial("tcp4", *addr)
+		conn, err := net.DialTimeout("tcp4", *addr, 5*time.Second)
 		if err != nil {
 			log.Fatalf("Failed to dial %s: %s", *addr, err)
 		}
