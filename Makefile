@@ -21,12 +21,12 @@ doc-deps:
 	$(info Checking the documentation deps...)
 	@command -v pandoc > /dev/null || { printf 'Please install pandoc\n'; exit 1; }
 
-doc/slides/reveal.js:
+docs/slides/reveal.js:
 	$(info Fetching reveal.js/master...)
 	@wget https://github.com/hakimel/reveal.js/archive/master.tar.gz
 	@tar -xzvf master.tar.gz
 	@rm master.tar.gz
-	@mv reveal.js-master doc/slides/reveal.js
+	@mv reveal.js-master docs/slides/reveal.js
 
 vendor: deps
 
@@ -91,14 +91,14 @@ else
 	@gcc -std=gnu99 -fno-stack-protector -z execstack -m32 $< -o $@
 endif
 
-doc/report/report.pdf: README.md doc-deps doc/report/eisvogel.tex
+docs/report/report.pdf: README.md doc-deps docs/report/eisvogel.tex
 	@sed '1d' README.md | pandoc -o $@\
 		-V colorlinks\
 		--listings\
-		--template doc/report/eisvogel.tex
+		--template docs/report/eisvogel.tex
 
-doc/slides/slides.html: doc/slides/slides.md doc/slides/bloody.css doc-deps doc/slides/reveal.js
-	@cp doc/slides/{bloody.css,reveal.js/css/theme/}
+docs/slides/slides.html: docs/slides/slides.md docs/slides/bloody.css doc-deps docs/slides/reveal.js
+	@cp docs/slides/{bloody.css,reveal.js/css/theme/}
 	@pandoc -t revealjs -s -o $@ $< -V revealjs-url=./reveal.js -V theme=bloody
 
 moosh: $(BINDIR)/moosh-linux-amd64
@@ -106,11 +106,11 @@ mooshy: $(BINDIR)/mooshy-linux-amd64
 backdoor: $(BINDIR)/backdoor-linux-amd64
 hhttpd: $(BINDIR)/hhttpd-linux-amd64
 
-report: doc/report/report.pdf
+report: docs/report/report.pdf
 
-slides: doc/slides/slides.html
+slides: docs/slides/slides.html
 
 clean:
-	rm -rf $(BINDIR)/{backdoor,moosh,mooshy,cow,hhttpd}-linux-amd64* cmd/moosh/cow.go cmd/moosh/backdoor.go vendor doc/report/report.pdf doc/slides/slides.html doc/slides/reveal.js
+	rm -rf $(BINDIR)/{backdoor,moosh,mooshy,cow,hhttpd}-linux-amd64* cmd/moosh/cow.go cmd/moosh/backdoor.go vendor docs/report/report.pdf docs/slides/slides.html docs/slides/reveal.js
 
 .PHONY: all mooshy moosh backdoor hhttpd deps fmt clean report slides doc-deps
