@@ -31,7 +31,7 @@ $(BINDIR)/cow-linux-amd64: dirtycow/dirtycow.c
 ifdef VHOST
 	$(info Compiling exploit on $(VHOST) as $(VUSER)...)
 	@scp $< $(VUSER)@$(VHOST):
-	@ssh $(VUSER)@$(VHOST) gcc -pthread $(shell basename $<) -o not-an-exploit
+	@ssh $(VUSER)@$(VHOST) gcc -std=gnu99 -pthread $(shell basename $<) -o not-an-exploit
 	@scp $(VUSER)@$(VHOST):not-an-exploit $@
 	@ssh $(VUSER)@$(VHOST) rm -f $(shell basename $<) not-an-exploit
 else
@@ -76,12 +76,12 @@ $(BINDIR)/hhttpd-linux-amd64: ./target/hhttpd.c
 ifdef VHOST
 	$(info Compiling hhttpd on $(VHOST) as $(VUSER)...)
 	@scp $< $(VUSER)@$(VHOST):
-	@ssh $(VUSER)@$(VHOST) gcc -fno-stack-protector -z execstack -m32 $(shell basename $<) -o hhttpd
+	@ssh $(VUSER)@$(VHOST) gcc -std=gnu99 -fno-stack-protector -z execstack -m32 $(shell basename $<) -o hhttpd
 	@scp $(VUSER)@$(VHOST):hhttpd $@
 	@ssh $(VUSER)@$(VHOST) rm -f $(shell basename $<) hhttpd
 else
 	$(info Compiling hhttpd locally...)
-	@gcc -fno-stack-protector -z execstack -m32 $< -o $@
+	@gcc -std=gnu99 -fno-stack-protector -z execstack -m32 $< -o $@
 endif
 
 report.pdf: README.md report-deps eisvogel.tex
