@@ -13,6 +13,7 @@
 * `mooshy`: front-end for infection
 * `moosh`: payload
 * `cow`: exploit implementing Dirty COW
+* `hhttpd`: a PoC web server to illustrate a buffer overflow
 
 # 1. Infection
 
@@ -27,6 +28,12 @@
 * CVE-2014-6271
 * Sends a GET request to the specified `addr`
 * Embedded script downloads `moosh` and executes it
+
+## Buffer overflow
+* `$ mooshy -bufferOverflow -addr ...`
+* Using buffer overflow in `hHTTPd`
+* Injects shellcode
+* Again, downloads `moosh` and executes it
 
 # 2. Escalation
 
