@@ -2,7 +2,7 @@ SHELL = /usr/bin/env bash
 
 BINDIR ?= bin
 
-VUSER ?= "averagejoe"
+VUSER ?= $(USER)
 
 GOBUILD ?= CGO_ENABLED=0 GOARCH=amd64 go build -ldflags="-w -s"
 UPX ?= upx -q -9
