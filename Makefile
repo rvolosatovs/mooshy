@@ -6,6 +6,7 @@ VUSER ?= $(USER)
 
 GOBUILD ?= CGO_ENABLED=0 GOARCH=amd64 go build -ldflags="-w -s"
 UPX ?= upx -q -9
+REVEAL_JS ?= https://github.com/hakimel/reveal.js/archive/master.tar.gz
 
 all: mooshy moosh hhttpd backdoor
 
@@ -22,11 +23,9 @@ doc-deps:
 	@command -v pandoc > /dev/null || { printf 'Please install pandoc\n'; exit 1; }
 
 docs/slides/reveal.js:
-	$(info Fetching reveal.js/master...)
-	@wget https://github.com/hakimel/reveal.js/archive/master.tar.gz
-	@tar -xzvf master.tar.gz
-	@rm master.tar.gz
-	@mv reveal.js-master docs/slides/reveal.js
+	$(info Fetching $(REVEAL_JS)...)
+	@mkdir -p $@
+	@curl -sL $(REVEAL_JS) | tar -xz --strip-components=1 -C $@
 
 vendor: deps
 
@@ -67,50 +66,55 @@ cmd/moosh/backdoor.go: $(BINDIR)/backdoor-linux-amd64
 $(BINDIR)/moosh-linux-amd64: cmd/moosh/cow.go cmd/moosh/backdoor.go cmd/moosh/moosh.go vendor
 	$(info Compiling $@...)
 	@$(GOBUILD) -o $@ ./cmd/moosh
-	@$(UPX) $@
+	$(info Packing $@...)
+	@$(UPX) $@ | sed '7q;d'
 
 $(BINDIR)/mooshy-linux-amd64: cmd/mooshy/mooshy.go vendor
 	$(info Compiling $@...)
 	@$(GOBUILD) -o $@ ./cmd/mooshy
-	@$(UPX) $@
+	$(info Packing $@...)
+	@$(UPX) $@ | sed '7q;d'
 
 $(BINDIR)/backdoor-linux-amd64: cmd/backdoor/backdoor.go vendor
-	$(info Compiling backdoor...)
+	$(info Compiling $@...)
 	@$(GOBUILD) -o $@ ./cmd/backdoor
-	@$(UPX) $@
+	$(info Packing $@...)
+	@$(UPX) $@ | sed '7q;d'
 
-$(BINDIR)/hhttpd-linux-amd64: ./target/hhttpd.c
+$(BINDIR)/hhttpd-linux-i386: ./target/hhttpd.c
 ifdef VHOST
-	$(info Compiling hhttpd on $(VHOST) as $(VUSER)...)
+	$(info Compiling $@ on $(VHOST) as $(VUSER)...)
 	@scp $< $(VUSER)@$(VHOST):
 	@ssh $(VUSER)@$(VHOST) gcc -std=gnu99 -fno-stack-protector -z execstack -m32 $(shell basename $<) -o hhttpd
 	@scp $(VUSER)@$(VHOST):hhttpd $@
 	@ssh $(VUSER)@$(VHOST) rm -f $(shell basename $<) hhttpd
 else
-	$(info Compiling hhttpd locally...)
+	$(info Compiling $@ locally...)
 	@gcc -std=gnu99 -fno-stack-protector -z execstack -m32 $< -o $@
 endif
 
 docs/report/report.pdf: README.md doc-deps docs/report/eisvogel.tex
+	$(info Generating $@...)
 	@sed '1d' README.md | pandoc -o $@\
 		-V colorlinks\
 		--listings\
 		--template docs/report/eisvogel.tex
 
 docs/slides/slides.html: docs/slides/slides.md docs/slides/bloody.css doc-deps docs/slides/reveal.js
+	$(info Generating $@...)
 	@cp docs/slides/{bloody.css,reveal.js/css/theme/}
 	@pandoc -t revealjs -s -o $@ $< -V revealjs-url=./reveal.js -V theme=bloody
 
 moosh: $(BINDIR)/moosh-linux-amd64
 mooshy: $(BINDIR)/mooshy-linux-amd64
 backdoor: $(BINDIR)/backdoor-linux-amd64
-hhttpd: $(BINDIR)/hhttpd-linux-amd64
+hhttpd: $(BINDIR)/hhttpd-linux-i386
 
 report: docs/report/report.pdf
 
 slides: docs/slides/slides.html
 
 clean:
-	rm -rf $(BINDIR)/{backdoor,moosh,mooshy,cow,hhttpd}-linux-amd64* cmd/moosh/cow.go cmd/moosh/backdoor.go vendor docs/report/report.pdf docs/slides/slides.html docs/slides/reveal.js
+	rm -rf vendor $(BINDIR)/{backdoor,moosh,mooshy,cow,hhttpd}-linux-amd64* cmd/moosh/{cow,backdoor}.go docs/report/report.pdf docs/slides/{slides.html,reveal.js}
 
 .PHONY: all mooshy moosh backdoor hhttpd deps fmt clean report slides doc-deps
