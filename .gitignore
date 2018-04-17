@@ -1,8 +1,11 @@
 bin
-known_hosts
 vendor
+
 *.pdf
-docs/slides/reveal.js
 *.html
+
+docs/slides/reveal.js
 cmd/moosh/backdoor.go
 cmd/moosh/cow.go
+
+known_hosts
