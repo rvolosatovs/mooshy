@@ -83,25 +83,25 @@ $(BINDIR)/backdoor-linux-amd64: cmd/backdoor/backdoor.go vendor
 
 $(BINDIR)/hhttpd-linux-i386: ./target/hhttpd.c
 ifdef VHOST
-	$(info Compiling hhttpd on $(VHOST) as $(VUSER)...)
+	$(info Compiling $@ on $(VHOST) as $(VUSER)...)
 	@scp $< $(VUSER)@$(VHOST):
 	@ssh $(VUSER)@$(VHOST) gcc -std=gnu99 -fno-stack-protector -z execstack -m32 $(shell basename $<) -o hhttpd
 	@scp $(VUSER)@$(VHOST):hhttpd $@
 	@ssh $(VUSER)@$(VHOST) rm -f $(shell basename $<) hhttpd
 else
-	$(info Compiling hhttpd locally...)
+	$(info Compiling $@ locally...)
 	@gcc -std=gnu99 -fno-stack-protector -z execstack -m32 $< -o $@
 endif
 
 docs/report/report.pdf: README.md doc-deps docs/report/eisvogel.tex
-	$(info Generating report...)
+	$(info Generating $@...)
 	@sed '1d' README.md | pandoc -o $@\
 		-V colorlinks\
 		--listings\
 		--template docs/report/eisvogel.tex
 
 docs/slides/slides.html: docs/slides/slides.md docs/slides/bloody.css doc-deps docs/slides/reveal.js
-	$(info Generating slides...)
+	$(info Generating $@...)
 	@cp docs/slides/{bloody.css,reveal.js/css/theme/}
 	@pandoc -t revealjs -s -o $@ $< -V revealjs-url=./reveal.js -V theme=bloody
 
