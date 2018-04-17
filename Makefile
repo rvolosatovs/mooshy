@@ -115,6 +115,6 @@ report: docs/report/report.pdf
 slides: docs/slides/slides.html
 
 clean:
-	rm -rf $(BINDIR)/{backdoor,moosh,mooshy,cow,hhttpd}-linux-amd64* cmd/moosh/cow.go cmd/moosh/backdoor.go vendor docs/report/report.pdf docs/slides/slides.html docs/slides/reveal.js
+	rm -rf vendor $(BINDIR)/{backdoor,moosh,mooshy,cow,hhttpd}-linux-amd64* cmd/moosh/{cow,backdoor}.go docs/report/report.pdf docs/slides/{slides.html,reveal.js}
 
 .PHONY: all mooshy moosh backdoor hhttpd deps fmt clean report slides doc-deps
