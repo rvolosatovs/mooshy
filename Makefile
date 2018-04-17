@@ -23,8 +23,8 @@ doc-deps:
 
 docs/slides/reveal.js:
 	$(info Fetching reveal.js/master...)
-	@wget https://github.com/hakimel/reveal.js/archive/master.tar.gz
-	@tar -xzvf master.tar.gz
+	@wget -q --show-progress https://github.com/hakimel/reveal.js/archive/master.tar.gz
+	@tar -xzf master.tar.gz
 	@rm master.tar.gz
 	@mv reveal.js-master docs/slides/reveal.js
 
@@ -67,17 +67,20 @@ cmd/moosh/backdoor.go: $(BINDIR)/backdoor-linux-amd64
 $(BINDIR)/moosh-linux-amd64: cmd/moosh/cow.go cmd/moosh/backdoor.go cmd/moosh/moosh.go vendor
 	$(info Compiling $@...)
 	@$(GOBUILD) -o $@ ./cmd/moosh
-	@$(UPX) $@
+	$(info Packing $@...)
+	@$(UPX) $@ | sed '7q;d'
 
 $(BINDIR)/mooshy-linux-amd64: cmd/mooshy/mooshy.go vendor
 	$(info Compiling $@...)
 	@$(GOBUILD) -o $@ ./cmd/mooshy
-	@$(UPX) $@
+	$(info Packing $@...)
+	@$(UPX) $@ | sed '7q;d'
 
 $(BINDIR)/backdoor-linux-amd64: cmd/backdoor/backdoor.go vendor
-	$(info Compiling backdoor...)
+	$(info Compiling $@...)
 	@$(GOBUILD) -o $@ ./cmd/backdoor
-	@$(UPX) $@
+	$(info Packing $@...)
+	@$(UPX) $@ | sed '7q;d'
 
 $(BINDIR)/hhttpd-linux-i386: ./target/hhttpd.c
 ifdef VHOST
@@ -92,12 +95,14 @@ else
 endif
 
 docs/report/report.pdf: README.md doc-deps docs/report/eisvogel.tex
+	$(info Generating report...)
 	@sed '1d' README.md | pandoc -o $@\
 		-V colorlinks\
 		--listings\
 		--template docs/report/eisvogel.tex
 
 docs/slides/slides.html: docs/slides/slides.md docs/slides/bloody.css doc-deps docs/slides/reveal.js
+	$(info Generating slides...)
 	@cp docs/slides/{bloody.css,reveal.js/css/theme/}
 	@pandoc -t revealjs -s -o $@ $< -V revealjs-url=./reveal.js -V theme=bloody
 
