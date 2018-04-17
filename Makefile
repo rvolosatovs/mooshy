@@ -6,6 +6,7 @@ VUSER ?= $(USER)
 
 GOBUILD ?= CGO_ENABLED=0 GOARCH=amd64 go build -ldflags="-w -s"
 UPX ?= upx -q -9
+REVEAL_JS ?= https://github.com/hakimel/reveal.js/archive/master.tar.gz
 
 all: mooshy moosh hhttpd backdoor
 
@@ -23,10 +24,7 @@ doc-deps:
 
 docs/slides/reveal.js:
 	$(info Fetching reveal.js/master...)
-	@wget -q --show-progress https://github.com/hakimel/reveal.js/archive/master.tar.gz
-	@tar -xzf master.tar.gz
-	@rm master.tar.gz
-	@mv reveal.js-master docs/slides/reveal.js
+	@curl -sL $(REVEAL_JS) | tar -xz --strip-components=1 -C $@
 
 vendor: deps
 
