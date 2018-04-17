@@ -23,7 +23,8 @@ doc-deps:
 	@command -v pandoc > /dev/null || { printf 'Please install pandoc\n'; exit 1; }
 
 docs/slides/reveal.js:
-	$(info Fetching reveal.js/master...)
+	$(info Fetching $(REVEAL_JS)...)
+	@mkdir -p $@
 	@curl -sL $(REVEAL_JS) | tar -xz --strip-components=1 -C $@
 
 vendor: deps
