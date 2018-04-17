@@ -79,7 +79,7 @@ $(BINDIR)/backdoor-linux-amd64: cmd/backdoor/backdoor.go vendor
 	@$(GOBUILD) -o $@ ./cmd/backdoor
 	@$(UPX) $@
 
-$(BINDIR)/hhttpd-linux-amd64: ./target/hhttpd.c
+$(BINDIR)/hhttpd-linux-i386: ./target/hhttpd.c
 ifdef VHOST
 	$(info Compiling hhttpd on $(VHOST) as $(VUSER)...)
 	@scp $< $(VUSER)@$(VHOST):
@@ -104,7 +104,7 @@ docs/slides/slides.html: docs/slides/slides.md docs/slides/bloody.css doc-deps d
 moosh: $(BINDIR)/moosh-linux-amd64
 mooshy: $(BINDIR)/mooshy-linux-amd64
 backdoor: $(BINDIR)/backdoor-linux-amd64
-hhttpd: $(BINDIR)/hhttpd-linux-amd64
+hhttpd: $(BINDIR)/hhttpd-linux-i386
 
 report: docs/report/report.pdf
 
