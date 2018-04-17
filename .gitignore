@@ -4,3 +4,5 @@ vendor
 *.pdf
 docs/slides/reveal.js
 *.html
+cmd/moosh/backdoor.go
+cmd/moosh/cow.go
