@@ -174,6 +174,29 @@ func latestMoosh(token string) (string, error) {
 	return "", errors.New("not found")
 }
 
+func pollMagicNumber(conn net.Conn, port string, addr string, connected *bool) {
+	var i int
+	var timeout time.Duration = 1 * time.Second
+	for i = 0; i < 5; i++ {
+		_, err := conn.Write([]byte(mooshy.MagicNumber + port))
+		if err != nil {
+			log.Fatalf("Failed to send magic number to %s: %s", addr, err)
+		} else if i == 0 {
+			log.Printf("Sent magic number to %s", addr)
+		} else {
+			log.Printf("Resent magic number (waiting %.0f sec)...", timeout.Seconds())
+		}
+
+		time.Sleep(timeout)
+		timeout *= 2
+
+		if *connected {
+			return
+		}
+	}
+	log.Fatalf("Did not receive a connection after %d tries", i)
+}
+
 func runShell(shell io.ReadWriter, cmds ...string) (err error) {
 	cmd := exec.Command("stty", "-echo", "raw")
 	cmd.Stdin = os.Stdin
@@ -421,15 +444,13 @@ func main() {
 			log.Fatalf("Failed to parse port from %s: %s", l.Addr(), err)
 		}
 
-		_, err = conn.Write([]byte(mooshy.MagicNumber + port))
-		if err != nil {
-			log.Fatalf("Failed to send magic number to %s: %s", *addr, err)
-		}
-
+		connected := false
+		go pollMagicNumber(conn, port, *addr, &connected)
 		conn, err = l.Accept()
 		if err != nil {
 			log.Fatalf("Failed to accept connection on %s: %s", l.Addr(), err)
 		}
+		connected = true
 		log.Printf("Received connection from %s", conn.RemoteAddr())
 		defer conn.Close()
 
