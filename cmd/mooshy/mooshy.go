@@ -194,10 +194,10 @@ func runShell(shell io.ReadWriter, cmds ...string) (err error) {
 		in = io.MultiReader(bytes.NewBufferString(strings.Join(cmds, "; ")+"\n"), in)
 	}
 
-	go io.Copy(os.Stdout, shell)
-	_, err = io.Copy(shell, in)
+	go io.Copy(shell, in)
+	_, err = io.Copy(os.Stdout, shell)
 	if err != nil {
-		errors.Wrap(err, "failed to pass in to reverse shell")
+		errors.Wrap(err, "failed to read from reverse shell")
 	}
 	return nil
 }
