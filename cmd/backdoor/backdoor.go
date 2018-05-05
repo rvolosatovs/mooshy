@@ -64,15 +64,15 @@ func main() {
 				"SHELL=/bin/bash",
 			}
 
-			stdin, _ := cmd.StdinPipe()
+			stdin, err := cmd.StdinPipe()
 			if err != nil {
 				conn.Write([]byte(fmt.Sprintf("Failed to create pipe to stdin: %s", err)))
 			}
-			stdout, _ := cmd.StdoutPipe()
+			stdout, err := cmd.StdoutPipe()
 			if err != nil {
 				conn.Write([]byte(fmt.Sprintf("Failed to create pipe to stdout: %s", err)))
 			}
-			stderr, _ := cmd.StderrPipe()
+			stderr, err := cmd.StderrPipe()
 			if err != nil {
 				conn.Write([]byte(fmt.Sprintf("Failed to create pipe to stderr: %s", err)))
 			}
