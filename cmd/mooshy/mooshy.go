@@ -447,7 +447,8 @@ func main() {
 			ch <- conn
 		}()
 
-		for timeout := time.Second; ; timeout *= 2 {
+		deadline := time.Now().Add(20 * time.Second)
+		for timeout := time.Second; time.Now().Before(deadline); timeout *= 2 {
 			if _, err := outConn.Write([]byte(mooshy.MagicNumber + port)); err != nil {
 				log.Printf("Failed to send magic number to %s: %s", *addr, err)
 			} else {
