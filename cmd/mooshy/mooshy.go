@@ -174,7 +174,7 @@ func latestMoosh(token string) (string, error) {
 	return "", errors.New("not found")
 }
 
-func pollMagicNumber(conn net.Conn, port string, addr string, connected chan struct{}) {
+func pollMagicNumber(conn net.Conn, port string, addr string, connected chan struct{}) error {
 	var i int
 	var timeout time.Duration = 1 * time.Second
 	for i = 0; i < 5; i++ {
@@ -192,11 +192,11 @@ func pollMagicNumber(conn net.Conn, port string, addr string, connected chan str
 
 		select {
 		case <-connected:
-			return
+			return nil
 		default:
 		}
 	}
-	log.Fatalf("Did not receive a connection after %d tries", i)
+	return fmt.Errorf("Did not receive a connection after %d tries", i)
 }
 
 func runShell(shell io.ReadWriter, cmds ...string) (err error) {
