@@ -447,18 +447,21 @@ func main() {
 			ch <- conn
 		}()
 
-		deadline := time.Now().Add(20 * time.Second)
-		for timeout := time.Second; time.Now().Before(deadline); timeout *= 2 {
+		deadline := time.After(20 * time.Second)
+		for timeout := time.Second; ; timeout *= 2 {
 			if _, err := outConn.Write([]byte(mooshy.MagicNumber + port)); err != nil {
 				log.Printf("Failed to send magic number to %s: %s", *addr, err)
 			} else {
 				log.Printf("Magic number sent, sleeping for %.0f sec...", timeout.Seconds())
 			}
 
-			time.Sleep(timeout)
+			select {
+			case <-time.After(timeout):
+			case <-deadline:
+				log.Fatal("Deadline exceeded")
+			}
 
 			var conn net.Conn
-
 			select {
 			case conn = <-ch:
 			default:
