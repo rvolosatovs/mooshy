@@ -35,6 +35,8 @@ $ mooshy -help
       	Use a buffer overflow for the infection
     -c string
       	Command to run before shell start
+    -deadline uint
+      	The amount of time (in seconds) to wait for a connection (default 20)
     -moosh string
       	Path to moosh. If empty - uses the one from https://github.com/rvolosatovs/mooshy/releases/latest
     -shellShock

